@@ -1,24 +1,13 @@
 
 # ------------------------------------------------------------------------------
 # About this code
-# download the JST data and process the data for prediction
+# ...creates the master data for advanced economies included in the JST data set
 
-# difference with the original paper...
-# NA rows are not deleted at this point
-# more variables added to the prediction
-  # level of exchange rates to the US dollar
-  # level of bank capital ratio
-  # level of bank loan to deposit ratio
-  # level of bank noncore funding ratio
-  # currency peg dummy
-  # two-year growth rates of house prices
-  # two-year change of mortgage loans / GDP ratio
-  # two-year change of household loans / GDP ratio
-  # two-year change of business loans / GDP ratio
-  # two-year change of level of bank capital ratio
-  # two-year change of level of bank loan to deposit ratio
-  # two-year change of level of bank noncore funding ratio
-# global variables constructed for all variables
+# The procedure is as follows:
+# 1. download the JST data 
+# 2. process the JST data (level to diff/growth/gap transformation)
+# 3. download the Baron et al.(2020) data and merge only equity returns
+
 # ------------------------------------------------------------------------------
 
 # set up------------------------------------------------------------------------
@@ -245,12 +234,29 @@
   
   # done! this procedure leaves us 1814 observations
 
+# ------------------------------------------------------------------------------
+# Prepare the equity value data from Baron et al. (2020): BVX hereafter
+# ------------------------------------------------------------------------------
+  
+  # load the .dta data saved under 4_data/input folder
+  df.BVX.original <- 
+    read_dta("../4_data/input/BVX_annual_regdata.dta")
+  
+  # keep only relevant values to merge
+  df.BVX <- 
+    df.BVX.original %>% 
+    select(year, ISO3, Rtot_real, Rtot_real_w) %>% 
+    rename(iso              = ISO3,
+           bank.eq          = Rtot_real,
+           bank.eq.winsored = Rtot_real_w)
+  
+  # merge with df.JST
+  df.JST <- 
+    df.JST %>% 
+    left_join(df.BVX, by = c("iso", "year"))
+  
   # save the data
   save(df.JST, file = "../4_data/df_JST.rda")
-  
-# ------------------------------------------------------------------------------
-# Prepare the equity value data from Baron et al. (2020)
-# ------------------------------------------------------------------------------
   
 # ------------------------------------------------------------------------------
 # normalize the data: this will be useful to compare the coefficients
@@ -259,10 +265,12 @@
   # create a recipe to scale the variables
   recipe.normalize <- 
     recipe(x = df.JST, formula = as.formula(crisis ~ .)) %>% 
-    # remove year and country from the predictors %>% 
-    update_role(year,    new_role = "time variable") %>% 
-    update_role(country, new_role = "id variable") %>% 
-    update_role(iso,     new_role = "id variable") %>% 
+    # remove some variables from the predictors %>% 
+    update_role(year,             new_role = "time variable") %>% 
+    update_role(country,          new_role = "id variable") %>% 
+    update_role(iso,              new_role = "id variable") %>% 
+    update_role(bank.eq,          new_role = "alternative target") %>% 
+    update_role(bank.eq.winsored, new_role = "alternative target") %>% 
     # normalize all the predictors to be distributed ~ N(0,1) 
     step_normalize(all_predictors(), skip = FALSE) %>% 
     # delete rows with no variance
