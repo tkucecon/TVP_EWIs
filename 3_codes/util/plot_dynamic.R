@@ -44,15 +44,29 @@ plot.dynamic <-
       summarise(significance = max(significance)) %>% 
       unlist()
     
+    # fill missing years with NA values
+    df.b_i <- 
+      df.b_i %>% 
+      complete(year = full_seq(year, 1))
+    
+    # plot if the series contains significant periods
+    # skip otherwise
     if (significance == 1) {
       # plot the current variable
       g.b_i <- 
         df.b_i %>% 
         ggplot() + 
+        geom_rect(aes(xmin = 1913, xmax = 1919,
+                      ymin = -Inf, ymax = Inf),
+                  fill = "gray", alpha = 1) + 
+        geom_rect(aes(xmin = 1932, xmax = 1946,
+                      ymin = -Inf, ymax = Inf),
+                  fill = "gray", alpha = 1) + 
         geom_ribbon(aes(x    = year,
                         ymin = p05,
                         ymax = p95),
-                    fill = "gray") + 
+                    fill = "royal blue", 
+                    alpha = 0.5) + 
         geom_line(aes(x = year, y = p50)) + 
         geom_hline(yintercept = 0, linetype = "dashed") + 
         labs(x = "Year", 
