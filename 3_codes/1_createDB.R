@@ -7,6 +7,9 @@
 # NA rows are not deleted at this point
 # more variables added to the prediction
   # level of exchange rates to the US dollar
+  # level of bank capital ratio
+  # level of bank loan to deposit ratio
+  # level of bank noncore funding ratio
   # currency peg dummy
   # two-year growth rates of house prices
   # two-year change of mortgage loans / GDP ratio
@@ -28,7 +31,9 @@
   theme_set(theme_solarized())
   
   library("skimr")
-  
+  library("mFilter")
+  library("tidymodels")
+
 # ------------------------------------------------------------------------------
 # Download the JST data
 # ------------------------------------------------------------------------------
@@ -47,60 +52,117 @@
   # ... 2017 data is now available
   
 # ------------------------------------------------------------------------------
-# preprocess the data to be consistent with the BOE paper
+# Preprocess the JST data
 # ------------------------------------------------------------------------------
   
-  # process the domestic variables following the definition of the BOE paper
-  df.JST.domestic <- 
+  # define some level variables and leave only relevant ones
+  df.JST.level <- 
     df.JST.original %>% 
     # group by the country
     group_by(country) %>% 
     # define the outcome variable: 1 and 2 year before the crisis is the target
-    mutate(crisis.f1 = lead(crisisJST, n = 1),
-           crisis.f2 = lead(crisisJST, n = 2)) %>%
+    mutate(
+      crisis.f1 = lead(crisisJST, n = 1),
+      crisis.f2 = lead(crisisJST, n = 2)) %>%
     mutate(crisis = if_else(
       crisis.f1 == 1 | crisis.f2 == 1, 1, 0
     )) %>% 
     # factorize the outcome variable: not numeric
     mutate(crisis = as.factor(crisis)) %>% 
     # define some features
-    mutate(slope.dom   = ltrate - stir,         # slope of the yield curve
-           tloans.pgdp = tloans / gdp,          # credit per GDP
-           money.pgdp  = money / gdp,           # money per GDP
-           ca.pgdp     = ca / gdp,              # current account per GDP
-           dsr         = tloans * ltrate / gdp, # debt service ratio
-           hpreal      = hpnom / cpi * 100,     # real house price
-           tmort.pgdp  = tmort / gdp,           # mortgage loan to GDP
-           thh.pgdp    = thh / gdp,             # household credit to GDP
-           tbus.pgdp   = tbus / gdp             # business credit to GDP
-             ) %>% 
-    # define some variables as 2-year difference of GDP-ratio * 100
     mutate(
-      credit.dom   = (tloans.pgdp   - lag(tloans.pgdp, n = 2)) * 100, # credit
-      dsr.dom      = (dsr           - lag(dsr,         n = 2)) * 100, # debt service ratio
-      iy.dom       = (iy            - lag(iy,          n = 2)) * 100, # investment
-      pdebt.dom    = (debtgdp       - lag(debtgdp,     n = 2)) * 100, # public debt
-      money.dom    = (money.pgdp    - lag(money.pgdp,  n = 2)) * 100, # money
-      ca.dom       = (ca.pgdp       - lag(ca.pgdp,     n = 2)) * 100, # current account
-      mortgage.dom = (tmort.pgdp    - lag(tmort.pgdp,  n = 2)) * 100, # mortgage loan
-      thh.dom      = (thh.pgdp      - lag(thh.pgdp,    n = 2)) * 100, # household credit
-      tbus.dom     = (tbus.pgdp     - lag(tbus.pgdp,   n = 2)) * 100  # business credit
+      level.slope       = ltrate - stir,         # slope of the yield curve
+      level.credit      = tloans / gdp,          # credit to GDP ratio
+      level.money       = money / gdp,           # money to GDP ratio
+      level.ca          = ca / gdp,              # current account to GDP ratio
+      level.dsr         = tloans * ltrate / gdp, # debt service ratio
+      level.hpreal      = hpnom / cpi * 100,     # real house price
+      level.tmort       = tmort / gdp,           # mortgage loan to GDP ratio
+      level.thh         = thh / gdp,             # household credit to GDP ratio
+      level.gdpreal     = gdp / cpi * 100        # real GDP
+             ) %>% 
+    # rename some variables to explicitly show that they are level variables
+    rename(
+      level.stir        = stir,                  # short-term interest rates
+      level.rcon        = rconpc,                # real consumption per capita
+      level.iy          = iy,                    # investment to GDP ratio
+      level.cpi         = cpi,                   # consumer price
+      level.pdebt       = debtgdp,               # public debt to GDP ratio
+      level.lev         = lev,                   # leverage of banks
+      level.ltd         = ltd,                   # loan to deposit ratio
+      level.noncore     = noncore                # noncore funding ratio
     ) %>% 
+    # keep only relevant variables for simplicity
+    select(year, country, iso, crisis, crisisJST, starts_with("level"), eq_tr)
+  
+  # Define some variables as 2-year difference of GDP-ratio * 100
+  df.JST.difference <- 
+    df.JST.level %>% 
+    mutate(
+      diff.credit   = (level.credit  - lag(level.credit,  n = 2)) * 100, # credit
+      diff.dsr      = (level.dsr     - lag(level.dsr,     n = 2)) * 100, # debt service ratio
+      diff.iy       = (level.iy      - lag(level.iy,      n = 2)) * 100, # investment
+      diff.pdebt    = (level.pdebt   - lag(level.pdebt,   n = 2)) * 100, # public debt
+      diff.money    = (level.money   - lag(level.money,   n = 2)) * 100, # money
+      diff.ca       = (level.ca      - lag(level.ca,      n = 2)) * 100, # current account
+      diff.mortgage = (level.tmort   - lag(level.tmort,   n = 2)) * 100, # mortgage loan
+      diff.thh      = (level.thh     - lag(level.thh,     n = 2)) * 100, # household credit
+      diff.lev      = (level.lev     - lag(level.lev,     n = 2)) * 100, # household credit
+      diff.ltd      = (level.ltd     - lag(level.ltd,     n = 2)) * 100, # household credit
+      diff.noncore  = (level.noncore - lag(level.noncore, n = 2)) * 100  # household credit
+    ) %>% 
+    # keep only difference variables and key indicators to merge
+    select(year, country, starts_with("diff"))
+    
+  # Define some variables as 2-year growth rates
+  df.JST.growth <- 
+    df.JST.level %>% 
     # define some variables as 2-year growth rate of index
-    mutate(pi.dom     = cpi    / lag(cpi,    n = 2) * 100 - 100,           # growth rate of the price level
-           rcon.dom   = rconpc / lag(rconpc, n = 2) * 100 - 100,           # growth rate of the consumption
-           equity.dom = ((1 + eq_tr) * (1 + lag(eq_tr, n = 1)) - 1) * 100, # growth rate of the equity price
-           hpreal.dom = hpreal / lag(hpreal, n = 2) * 100 - 100            # growth rate of the real house prices
+    mutate(
+      growth.cpi    = level.cpi    / lag(level.cpi,    n = 2) * 100 - 100, # growth rate of the CPI
+      growth.rcon   = level.rcon   / lag(level.rcon,   n = 2) * 100 - 100, # growth rate of the consumption
+      growth.hpreal = level.hpreal / lag(level.hpreal, n = 2) * 100 - 100, # growth rate of the real house prices
+      growth.equity = ((1 + eq_tr) * (1 + lag(eq_tr, n = 1)) - 1) * 100    # growth rate of the equity price
            ) %>% 
-    # define some variables as 2-year difference of levels
-    mutate(lev.dom     = lev     - lag(lev,     n = 2), # bank leverage
-           noncore.dom = noncore - lag(noncore, n = 2)  # bank noncore funding ratio
+    select(year, country, starts_with("growth"))
+  
+  # Define some variables as the gap from HP filtered series
+  df.JST.gap <- 
+    df.JST.level %>% 
+    select(year, country, starts_with("level")) %>% 
+    ungroup() %>% 
+    gather(key = "key", value = "value", starts_with("level")) %>% 
+    group_by(country, key) %>% 
+    drop_na() %>% 
+    mutate(cycle = hpfilter(value, type = "lambda", freq = 6.25)$cycle) %>% 
+    select(-value) %>% 
+    ungroup() %>% 
+    spread(key = "key", value = "cycle") %>% 
+    arrange(country, year) %>% 
+    rename(
+      gap.credit  = level.credit,
+      gap.gdpreal = level.gdpreal,
+      gap.thh     = level.thh,
+      gap.tmort   = level.tmort,
+      gap.lev     = level.lev,
+      gap.ltd     = level.ltd,
+      gap.dsr     = level.dsr,
+      gap.ca      = level.ca,
+      gap.noncore = level.noncore
     ) %>% 
-    # rename short term interest rates
-    rename(stir.dom = stir) %>% 
+    select(year, country, starts_with("gap"))
+  
+  # merge all the data as the domestic data set
+  df.JST.domestic <- 
+    # merge all the data
+    df.JST.level %>% 
+    select(-eq_tr) %>% 
+    left_join(df.JST.difference, by = c("country", "year")) %>% 
+    left_join(df.JST.growth,     by = c("country", "year")) %>% 
+    left_join(df.JST.gap,        by = c("country", "year")) %>% 
     # create a dummy to exclude the crisis year and four subsequent years
     mutate(crisis.ex = if_else(
-      crisisJST == 1 | 
+        crisisJST == 1 | 
         lag(crisisJST, n = 1) == 1 | 
         lag(crisisJST, n = 2) == 1 | 
         lag(crisisJST, n = 3) == 1 | 
@@ -112,17 +174,20 @@
     # exclude some unusual periods
     filter(!(year >= 1933 & year <= 1939)) %>% # exclude the great depression period
     filter(!(year >= 1914 & year <= 1918)) %>% # exclude the WW1 period
-    filter(!(year >= 1939 & year <= 1945)) %>%  # exclude the WW2 period
+    filter(!(year >= 1939 & year <= 1945)) %>% # exclude the WW2 period
     # reset the grouping
     ungroup() %>% 
     # keep only the relevant variables
-    select(year, country, crisis, ends_with(".dom")) 
+    select(-crisisJST, -crisis.ex) %>% 
+    # rename the variables to explicitly indicate that they are domestic variables
+    gather(key = "key", value = "value", -year, -country, -iso, -crisis) %>% 
+    mutate(key = paste(key, ".dom", sep = "")) %>% 
+    spread(key = "key", value = "value") %>% 
+    arrange(country, year)
   
   # df.JST.domestic now includes only the domestic data
   # calculate global variables
-  # ... original paper uses global yield curve slope and global credit
-  # ... but here I add more variables for later use
-  
+
   # obtain the name of all the countries in the data
   countries.JST <- 
     df.JST.domestic %>% 
@@ -141,7 +206,7 @@
     df.JST.domestic %>% 
     rename_with(\(x) str_replace(x, ".dom", ".glo"),
                 ends_with(".dom")) %>% 
-    select(-crisis) %>% 
+    select(-crisis, -iso) %>% 
     filter(country == "hogehoge")
   
   # repeat the process for all the countries
@@ -179,9 +244,54 @@
     filter(!is.na(crisis))
   
   # done! this procedure leaves us 1814 observations
-  # if we delete the NA rows of the relevant data, 
-  # this will shrink to 1260 observations (consistent with the BOE paper)
-  
+
   # save the data
   save(df.JST, file = "../4_data/df_JST.rda")
+  
+# ------------------------------------------------------------------------------
+# Prepare the equity value data from Baron et al. (2020)
+# ------------------------------------------------------------------------------
+  
+# ------------------------------------------------------------------------------
+# normalize the data: this will be useful to compare the coefficients
+# ------------------------------------------------------------------------------
+  
+  # create a recipe to scale the variables
+  recipe.normalize <- 
+    recipe(x = df.JST, formula = as.formula(crisis ~ .)) %>% 
+    # remove year and country from the predictors %>% 
+    update_role(year,    new_role = "time variable") %>% 
+    update_role(country, new_role = "id variable") %>% 
+    update_role(iso,     new_role = "id variable") %>% 
+    # normalize all the predictors to be distributed ~ N(0,1) 
+    step_normalize(all_predictors(), skip = FALSE) %>% 
+    # delete rows with no variance
+    step_zv(all_predictors(), skip = FALSE) 
+  
+  # create an empty data frame to stack the data
+  df.JST.normalized <- 
+    df.JST %>% 
+    filter(country == "hogehoge")
+  
+  # apply the recipe to all countries: now group_by is not allowed for recipes
+  for (target.country in countries.JST) {
+    # create normalized data frame for a specific country
+    df.JST.ctry <- 
+      df.JST %>% 
+      # keep only one specific country
+      filter(country == target.country)
+    
+    # create a data frame with imputed variables
+    df.JST.normalized.tmp <- 
+      recipe.normalize %>% 
+      prep() %>% 
+      bake(new_data = df.JST.ctry)
+
+    # stack the data into the global data frame
+    df.JST.normalized <- 
+      bind_rows(df.JST.normalized, df.JST.normalized.tmp)  
+  }
+  
+  # save the data
+  save(df.JST.normalized, file = "../4_data/df_JST_normalized.rda")
   
