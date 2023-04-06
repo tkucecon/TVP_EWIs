@@ -246,9 +246,12 @@
   df.BVX <- 
     df.BVX.original %>% 
     select(year, ISO3, Rtot_real, Rtot_real_w) %>% 
-    rename(iso              = ISO3,
-           bank.eq          = Rtot_real,
-           bank.eq.winsored = Rtot_real_w)
+    rename(iso     = ISO3,
+           bank.eq = Rtot_real_w) %>% 
+    group_by(iso) %>% 
+    mutate(bank.eq.f1 = lead(bank.eq, n = 1),
+           bank.eq.f2 = lead(bank.eq, n = 2)) %>% 
+    ungroup()
   
   # merge with df.JST
   df.JST <- 
@@ -269,8 +272,8 @@
     update_role(year,             new_role = "time variable") %>% 
     update_role(country,          new_role = "id variable") %>% 
     update_role(iso,              new_role = "id variable") %>% 
-    update_role(bank.eq,          new_role = "alternative target") %>% 
-    update_role(bank.eq.winsored, new_role = "alternative target") %>% 
+    update_role(bank.eq.f1,       new_role = "alternative target") %>% 
+    update_role(bank.eq.f2,       new_role = "alternative target") %>% 
     # normalize all the predictors to be distributed ~ N(0,1) 
     step_normalize(all_predictors(), skip = FALSE) %>% 
     # delete rows with no variance
