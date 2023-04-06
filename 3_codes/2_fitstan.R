@@ -15,6 +15,7 @@
   library("rstan")
   
   # some functions
+  source("util/saveMCMC.r")
   source("util/plot_dynamic.r")
   source("util/plot_heat.r")
   
@@ -31,12 +32,13 @@
   # load the JST data
   load("../4_data/df_JST_normalized.rda")
   
-  # keep only the relevant variables and remove NA rows
-  df.JST.normalized <- 
+  # keep only the relevant variables and remove NA rows:
+  
+  # data frame 1: crisis dummy with baseline explanatory variables
+  df.crisis.baseline <- 
     df.JST.normalized %>% 
     select(year, country, crisis, 
            # macro variables
-           starts_with("growth.gdpreal"),
            starts_with("diff.credit"),
            starts_with("level.slope"),
            starts_with("growth.cpi"),
@@ -50,136 +52,106 @@
            starts_with("level.lev")
            ) %>% 
     na.omit()
+  
+  # data frame 2: bank equity return (f2) with baseline explanatory variables
+  df.eqf2.baseline <- 
+    df.JST.normalized %>% 
+    select(year, country, bank.eq.f2, 
+           # macro variables
+           starts_with("diff.credit"),
+           starts_with("level.slope"),
+           starts_with("growth.cpi"),
+           starts_with("diff.money"),
+           starts_with("growth.equity"),
+           starts_with("diff.iy"),
+           diff.ca.dom,
+           diff.dsr.dom,
+           growth.hpreal.dom,
+           # bank balance sheet variables
+           starts_with("level.lev")
+    ) %>% 
+    na.omit()
 
-# ------------------------------------------------------------------------------
-# Prepare the data set
-# ------------------------------------------------------------------------------
-  
-  # create the country ID according to countries
-  df.JST.normalized <- 
+  # data frame 3: crisis dummy with all explanatory variables (excluding gap vars)
+  df.crisis.allvars <- 
     df.JST.normalized %>% 
-    group_by(year) %>% 
-    mutate(time.id = cur_group_id()) %>% 
-    ungroup()
+    select(year, country, crisis, 
+           # macro variables
+           starts_with("level."),
+           starts_with("diff."),
+           starts_with("growth.")
+    ) %>% 
+    na.omit()
   
-  # create a data frame indicating year and ID 
-  df.time.id <- 
+  # data frame 4: bank equity return (f2) with all explanatory variables (excluding gap vars)
+  df.eqf2.allvars <- 
     df.JST.normalized %>% 
-    select(year, time.id) %>% 
-    unique() %>% 
-    arrange(time.id)
+    select(year, country, bank.eq.f2, 
+           # macro variables
+           starts_with("level."),
+           starts_with("diff."),
+           starts_with("growth.")
+    ) %>% 
+    na.omit()
   
-  # matrix of explanatory variables
-  X.JST <- 
-    df.JST.normalized %>% 
-    select(-year, -country, -crisis, -time.id) %>% 
-    as.matrix()
-  
-  # add the intercept
-  X <- cbind(1, X.JST)
-  
-  # vector of response dummy variable
-  Y <- 
-    df.JST.normalized %>% 
-    select(crisis) %>% 
-    mutate(crisis = as.numeric(crisis) - 1) %>% 
-    unlist() %>% 
-    as.numeric()
-  
-  # vector of time id
-  Tid <- 
-    df.JST.normalized$time.id
-  
-  # input data
-  data.stan <- 
-    list(I        = nrow(X), 
-         p        = ncol(X),
-         Tmax     = max(Tid),
-         X        = X,
-         Y        = Y,
-         Tid      = Tid
-    )
   
 # ------------------------------------------------------------------------------
-# Baseline: Gaussian state equation
+# run MCMC in multiple settings and save under 5_tmp folder
 # ------------------------------------------------------------------------------
   
-  # fit the Bayesian model
-  fit.stan <- 
-    stan(file   = "stan/gaussian.stan",
-         data   = data.stan,
-         seed   = 2292,
-         pars   = c("beta", "theta"),
-         warmup = 2000,
-         iter   = 3000)
+  # 1. gaussian transition with df.crisis.baseline
+  saveMCMC(df        = df.crisis.baseline,
+           target    = "crisis",
+           stan.file = "gaussian.stan",
+           MCMC.name = "gaussian_crisis_baseline.rda")
   
-  # This process takes some time... save the result in the tmp folder
-  save(fit.stan, file = "../5_tmp/fit_gaussian.rda")
+  # 2. gaussian transition with df.equity.baseline
+  saveMCMC(df        = df.eqf2.baseline,
+           target    = "bank.eq.f2",
+           stan.file = "lmgaussian.stan",
+           MCMC.name = "lmgaussian_eqf2_baseline.rda")
   
-  # Check the posteriors of the MCMC
-  # If you start from this line, run this code
-  load("../5_tmp/fit_gaussian.rda")
+  # 3. gaussian transition with df.crisis.allvars
+  saveMCMC(df        = df.crisis.allvars,
+           target    = "crisis",
+           stan.file = "gaussian.stan",
+           MCMC.name = "gaussian_crisis_allvars.rda")
   
-  # extract the fitted model
-  extracted.stan <- 
-    extract(fit.stan)
-  
-  # plot the heat-map
-  g.heat <- 
-    plot.heat(significance = FALSE)
-  
-  # plot only significant variables
-  g.sig.ts <- 
-    plot.dynamic()
-  
-  # save the graph
-  ggsave(plot = g.heat, 
-         width = 10, height = 4, 
-         filename = "../6_outputs/heat_gaussian.pdf")
-  
-  ggsave(plot = g.sig.ts, 
-         width = 10, height = 4, 
-         filename = "../6_outputs/ts_gaussian.pdf")
+  # 4. gaussian transition with df.equity.allvars
+  saveMCMC(df        = df.eqf2.allvars,
+           target    = "bank.eq.f2",
+           stan.file = "lmgaussian.stan",
+           MCMC.name = "lmgaussian_eqf2_allvars.rda")
   
 # ------------------------------------------------------------------------------
-# Robustness check: structural change
+# plot the results
 # ------------------------------------------------------------------------------
+
+  # 1. gaussian transition with df.crisis.baseline
+  plot.heat(MCMC.name  = "gaussian_crisis_baseline.rda",
+            graph.name = "gaussian_crisis_baseline_heat.pdf")
   
-  # fit the Bayesian model
-  fit.stan <- 
-    stan(file   = "stan/structural_change.stan",
-         data   = data.stan,
-         seed   = 2292,
-         pars   = c("beta"),
-         warmup = 2000,
-         iter   = 3000)
+  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline.rda",
+               graph.name = "gaussian_crisis_baseline_ts.pdf")
+
+  # 2. gaussian transition with df.equity.baseline
+  plot.heat(MCMC.name  = "lmgaussian_eqf2_baseline.rda",
+            graph.name = "lmgaussian_eqf2_baseline_heat.pdf")
   
-  # This process takes some time... save the result in the tmp folder
-  save(fit.stan, file = "../5_tmp/fit_structural_change.rda")
+  plot.dynamic(MCMC.name  = "lmgaussian_eqf2_baseline.rda",
+               graph.name = "lmgaussian_eqf2_baseline_ts.pdf")
   
-  # Check the posteriors of the MCMC
-  # If you start from this line, run this code
-  # load("../5_tmp/fit_structural_change.rda")
+  # 3. gaussian transition with df.equity.allvars
+  plot.heat(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
+            graph.name = "lmgaussian_eqf2_allvars_heat.pdf")
   
-  # extract the fitted model
-  extracted.stan <- 
-    extract(fit.stan)
+  plot.dynamic(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
+               graph.name = "lmgaussian_eqf2_allvars_ts.pdf")
   
-  # plot the heat-map
-  g.heat <- 
-    plot.heat(significance = FALSE)
+  # 4. gaussian transition with df.equity.baseline
+  plot.heat(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
+            graph.name = "lmgaussian_eqf2_allvars_heat.pdf")
   
-  # plot only significant variables
-  g.sig.ts <- 
-    plot.dynamic()
-  
-  # save the graph
-  ggsave(plot = g.heat, 
-         width = 10, height = 4, 
-         filename = "../6_outputs/heat_sc.pdf")
-  
-  ggsave(plot = g.sig.ts, 
-         width = 10, height = 4, 
-         filename = "../6_outputs/ts_sc.pdf")
-  
+  plot.dynamic(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
+               graph.name = "lmgaussian_eqf2_allvars_ts.pdf")
   
