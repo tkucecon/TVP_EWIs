@@ -5,21 +5,36 @@
 # ------------------------------------------------------------------------------
 
 plot.heat <- 
-  function(significance){
+  function(MCMC.name,
+           graph.name,
+           significance = FALSE){
     
+  # load the MCMC data and extract necessary information
+  load(paste("../5_tmp/", MCMC.name, sep = ""))
+  
+  # extracted data 
+  extracted.stan <- 
+    extract(out.stan[[2]])
+  
+  # correspondence data frame between time id and year
+  df.time.id <- out.stan[[3]]
+  
+  # number of covariates
+  p <- out.stan[[1]]$p
+  
+  # name of covariates
+  varnames <- colnames(out.stan[[1]]$X)
+      
   # clean up the global environment to avoid conflicts
   if (exists("df.plot")) {
     rm(df.plot)
   }
   
-  # check the dimension of the coefficients
-  p <- dim(extracted.stan$beta)[2]
-    
   # repeat for all the variables
   for (i in 2:p) {
     
     # check the name of the current variable
-    varname <- colnames(X)[i]
+    varname <- varnames[i]
     
     # check the dynamics of the series
     df.b_i <- 
@@ -34,7 +49,7 @@ plot.heat <-
                 p95 = quantile(value, 0.95)) %>% 
       left_join(df.time.id, by = "time.id")
     
-    # if input significance is true, check if there are some significant periods
+    # if input "significance" is true, check if there are some significant periods
     # otherwise return the median of posteriors
     if (significance) {
       df.b_coef <- 
@@ -75,6 +90,11 @@ plot.heat <-
     ggplot() +
     geom_tile(aes(x = year, y = variables, fill = coefs)) + 
     scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0)
+  
+  # save under the 6_output folder
+  ggsave(plot = g.heat, 
+         width = 10, height = 4, 
+         filename = paste("../6_outputs/", graph.name, sep = ""))
   
   # return the heat-map
   return(g.heat)

@@ -5,20 +5,34 @@
 # ------------------------------------------------------------------------------
 
 plot.dynamic <- 
-  function(){
+  function(MCMC.name,
+           graph.name){
   
+  # load the MCMC data and extract necessary information
+  load(paste("../5_tmp/", MCMC.name, sep = ""))
+  
+  # extracted data 
+  extracted.stan <- 
+    extract(out.stan[[2]])
+  
+  # correspondence data frame between time id and year
+  df.time.id <- out.stan[[3]]
+  
+  # number of covariates
+  p <- out.stan[[1]]$p
+  
+  # name of covariates: 
+  varnames <- colnames(out.stan[[1]]$X)
+    
   # clean up the global environment to avoid conflicts
   if (exists("g.all")) {
     rm(g.all)
   }
     
-  # check the dimension of the coefficients
-  p <- dim(extracted.stan$beta)[2]
-    
   # repeat for all the variables
   for (i in 2:p) {
     # check the name of the current variable
-    varname <- colnames(X)[i]
+    varname <- varnames[i]
     
     # check the dynamics of the series
     df.b_i <- 
@@ -81,5 +95,11 @@ plot.dynamic <-
     }
   }
   
+  # save under the 6_output folder
+  ggsave(plot = g.all, 
+         width = 10, height = 4, 
+         filename = paste("../6_outputs/", graph.name, sep = ""))
+  
+  # return and show the plot
   return(g.all)
 }
