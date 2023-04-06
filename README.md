@@ -6,12 +6,12 @@ GitHub page for the paper: XXXX (name of the paper to be updated)
 This code downloads the two data set
 - JST data: main data set  
  from Macrohistory database (http://data.macrohistory.net/JST/JSTdatasetR5.dta) 
- - Baron et al.(2020)[^1]data: bank equity return  
+ - Baron et al.(2021)[^1]data: bank equity return  
  from the author's website (http://wxiong.mycpanel.princeton.edu/)
 
 [^1]: Baron, Matthew, Emil Verner, and Wei Xiong. "Banking crises without panics." The Quarterly Journal of Economics 136.1 (2021): 51-113.
 
- and creates the master data under 4_data folder. Please note that the resulting data sets are
+ and creates the master data under 4_data folder. The resulting data sets are
 - df.JST: contains raw values
 - df.JST.normalized: contains normalized explanatory variables (mean=0, sd=1)
 
@@ -24,14 +24,16 @@ where $q_{i,t}$ is the logit transformed probability of financial crisis ($Pr[cr
 
 Linear models for the robustness check assumes that 
 $$y_{i,t} = X_{i,t}\beta_t + \varepsilon_{i,t}$$
-where $y_{i,t}$ is 99%-winsorized annual bank equity returns. 
+where $y_{i,t}$ is 99%-winsorized annual bank equity returns 1 or 2 years ahead. 
 
 The structure of state equation differs according to the stan file (gaussian random-walk or possible structural changes). See each stan files for details.
 
 ## stan/gaussian.stan
 Stan code to run MCMC estimation for the baseline model. Here I assume that the coefficients are identical across countries contemporally, but evolves over time following a random walk with Gaussian errors (state equation), namely
 $$\beta_t \sim N(\beta_{t-1}, \sigma)$$
-This state equation implicitly assumes that the coefficients smoothly and slowly evolves over time. To avoid the problem of over-fitting and allow for sparsity, Horseshoe priors are assumed for both $\beta_0$ and $\sigma$.
+This state equation implicitly assumes that the coefficients smoothly and slowly evolves over time. To avoid the problem of over-fitting and allow for sparsity, Horseshoe priors are assumed for both $\beta_0$ and $\sigma$. For the estimation of TVP models under the assumption of sparsity, see Bitto and Fruhwirth-Schnatter (2019)[^2].
+
+[^2]: Bitto, Angela, and Sylvia Frühwirth-Schnatter. "Achieving shrinkage in a time-varying parameter model framework." Journal of Econometrics 210.1 (2019): 75-97.
 
 ## util/plot_heat.r
 A function to plot a heat-map of the time-varying coefficients. 
