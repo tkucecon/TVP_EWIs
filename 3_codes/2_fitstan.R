@@ -53,10 +53,10 @@
            ) %>% 
     na.omit()
   
-  # data frame 2: bank equity return (f2) with baseline explanatory variables
-  df.eqf2.baseline <- 
+  # data frame 2: bank equity return (f1) with baseline explanatory variables
+  df.eqf1.baseline <- 
     df.JST.normalized %>% 
-    select(year, country, bank.eq.f2, 
+    select(year, country, bank.eq.f1, 
            # macro variables
            starts_with("diff.credit"),
            starts_with("level.slope"),
@@ -83,10 +83,10 @@
     ) %>% 
     na.omit()
   
-  # data frame 4: bank equity return (f2) with all explanatory variables (excluding gap vars)
+  # data frame 4: bank equity return (f1) with all explanatory variables (excluding gap vars)
   df.eqf2.allvars <- 
     df.JST.normalized %>% 
-    select(year, country, bank.eq.f2, 
+    select(year, country, bank.eq.f1, 
            # macro variables
            starts_with("level."),
            starts_with("diff."),
@@ -94,6 +94,20 @@
     ) %>% 
     na.omit()
   
+  # data frame 5: crisis dummy with only relevant (core) explanatory variables
+  df.crisis.core <- 
+    df.JST.normalized %>% 
+    select(year, country, crisis, 
+           diff.credit.dom,
+           level.slope.dom,
+           diff.money.glo,
+           diff.iy.dom,
+           diff.iy.glo,
+           diff.ca.dom,
+           diff.dsr.dom,
+           level.lev.dom
+    ) %>% 
+    na.omit()
   
 # ------------------------------------------------------------------------------
 # run MCMC in multiple settings and save under 5_tmp folder
@@ -106,10 +120,10 @@
            MCMC.name = "gaussian_crisis_baseline.rda")
   
   # 2. gaussian transition with df.equity.baseline
-  saveMCMC(df        = df.eqf2.baseline,
-           target    = "bank.eq.f2",
+  saveMCMC(df        = df.eqf1.baseline,
+           target    = "bank.eq.f1",
            stan.file = "lmgaussian.stan",
-           MCMC.name = "lmgaussian_eqf2_baseline.rda")
+           MCMC.name = "lmgaussian_eqf1_baseline.rda")
   
   # 3. gaussian transition with df.crisis.allvars
   saveMCMC(df        = df.crisis.allvars,
@@ -119,9 +133,15 @@
   
   # 4. gaussian transition with df.equity.allvars
   saveMCMC(df        = df.eqf2.allvars,
-           target    = "bank.eq.f2",
+           target    = "bank.eq.f1",
            stan.file = "lmgaussian.stan",
-           MCMC.name = "lmgaussian_eqf2_allvars.rda")
+           MCMC.name = "lmgaussian_eqf1_allvars.rda")
+  
+  # 5. possible structural breaks with df.crisis.baseline
+  # saveMCMC(df        = df.crisis.baseline,
+  #          target    = "crisis",
+  #          stan.file = "koop.stan",
+  #          MCMC.name = "koop_crisis_baseline.rda")
   
 # ------------------------------------------------------------------------------
 # plot the results
@@ -135,23 +155,24 @@
                graph.name = "gaussian_crisis_baseline_ts.pdf")
 
   # 2. gaussian transition with df.equity.baseline
-  plot.heat(MCMC.name  = "lmgaussian_eqf2_baseline.rda",
-            graph.name = "lmgaussian_eqf2_baseline_heat.pdf")
+  plot.heat(MCMC.name  = "lmgaussian_eqf1_baseline.rda",
+            graph.name = "lmgaussian_eqf1_baseline_heat.pdf")
   
-  plot.dynamic(MCMC.name  = "lmgaussian_eqf2_baseline.rda",
-               graph.name = "lmgaussian_eqf2_baseline_ts.pdf")
+  plot.dynamic(MCMC.name  = "lmgaussian_eqf1_baseline.rda",
+               graph.name = "lmgaussian_eqf1_baseline_ts.pdf")
   
-  # 3. gaussian transition with df.equity.allvars
-  plot.heat(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
-            graph.name = "lmgaussian_eqf2_allvars_heat.pdf")
+  # 3. gaussian transition with df.crisis.allvars
+  plot.heat(MCMC.name  = "gaussian_crisis_allvars.rda",
+            graph.name = "gaussian_crisis_allvars_heat.pdf")
   
-  plot.dynamic(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
-               graph.name = "lmgaussian_eqf2_allvars_ts.pdf")
+  plot.dynamic(MCMC.name  = "gaussian_crisis_allvars.rda",
+               graph.name = "gaussian_crisis_allvars_ts.pdf")
   
   # 4. gaussian transition with df.equity.baseline
-  plot.heat(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
-            graph.name = "lmgaussian_eqf2_allvars_heat.pdf")
+  plot.heat(MCMC.name  = "lmgaussian_eqf1_allvars.rda",
+            graph.name = "lmgaussian_eqf1_allvars_heat.pdf")
   
-  plot.dynamic(MCMC.name  = "lmgaussian_eqf2_allvars.rda",
-               graph.name = "lmgaussian_eqf2_allvars_ts.pdf")
+  plot.dynamic(MCMC.name  = "lmgaussian_eqf1_allvars.rda",
+               graph.name = "lmgaussian_eqf1_allvars_ts.pdf")
   
+  # 5. possible structural breaks with df.equity.core
