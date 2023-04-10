@@ -6,8 +6,8 @@
 # The procedure is as follows:
 # 1. download the JST data 
 # 2. process the JST data (level to diff/growth/gap transformation)
+#    ... for the growth predictors, winsorize and remove the effects of outliers
 # 3. download the Baron et al.(2020) data and merge only equity returns
-
 # ------------------------------------------------------------------------------
 
 # set up------------------------------------------------------------------------
@@ -22,6 +22,7 @@
   library("skimr")
   library("mFilter")
   library("tidymodels")
+  library("DescTools")
 
 # ------------------------------------------------------------------------------
 # Download the JST data
@@ -112,6 +113,12 @@
       growth.rcon   = level.rcon   / lag(level.rcon,   n = 2) * 100 - 100, # growth rate of the consumption
       growth.hpreal = level.hpreal / lag(level.hpreal, n = 2) * 100 - 100, # growth rate of the real house prices
       growth.equity = ((1 + eq_tr) * (1 + lag(eq_tr, n = 1)) - 1) * 100    # growth rate of the equity price
+           ) %>% 
+    # winsorize the variables and remove the effects of outliers
+    mutate(growth.cpi    = Winsorize(growth.cpi,    probs = c(0.05, 0.95), na.rm = TRUE),
+           growth.rcon   = Winsorize(growth.rcon,   probs = c(0.05, 0.95), na.rm = TRUE),
+           growth.hpreal = Winsorize(growth.hpreal, probs = c(0.05, 0.95), na.rm = TRUE),
+           growth.equity = Winsorize(growth.equity, probs = c(0.05, 0.95), na.rm = TRUE)
            ) %>% 
     select(year, country, starts_with("growth"))
   
