@@ -84,7 +84,7 @@
     na.omit()
   
   # data frame 4: bank equity return (f1) with all explanatory variables (excluding gap vars)
-  df.eqf2.allvars <- 
+  df.eqf1.allvars <- 
     df.JST.normalized %>% 
     select(year, country, bank.eq.f1, 
            # macro variables
@@ -132,7 +132,7 @@
            MCMC.name = "gaussian_crisis_allvars.rda")
   
   # 4. gaussian transition with df.equity.allvars
-  saveMCMC(df        = df.eqf2.allvars,
+  saveMCMC(df        = df.eqf1.allvars,
            target    = "bank.eq.f1",
            stan.file = "lmgaussian.stan",
            MCMC.name = "lmgaussian_eqf1_allvars.rda")
