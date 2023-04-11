@@ -40,6 +40,7 @@ vignettes/*.pdf
 
 # ignore the following folders
 3_codes/×/
+3_codes/util/×/
 5_tmp/
 4_data/input/
 
