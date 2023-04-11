@@ -43,7 +43,9 @@ plot.dynamic <-
       gather(key = iter, value = value, -time.id) %>% 
       group_by(time.id) %>% 
       summarise(p05 = quantile(value, 0.05),
+                p16 = quantile(value, 0.16),
                 p50 = quantile(value, 0.5),
+                p84 = quantile(value, 0.84),
                 p95 = quantile(value, 0.95)) %>% 
       left_join(df.time.id, by = "time.id")
     
@@ -55,7 +57,7 @@ plot.dynamic <-
         p95 < 0 ~ 1,
         TRUE    ~ 0
       )) %>% 
-      summarise(significance = max(significance)) %>% 
+      summarise(significance = max(significance, na.rm = TRUE)) %>% 
       unlist()
     
     # fill missing years with NA values
@@ -77,10 +79,15 @@ plot.dynamic <-
                       ymin = -Inf, ymax = Inf),
                   fill = "gray", alpha = 1) + 
         geom_ribbon(aes(x    = year,
+                        ymin = p16,
+                        ymax = p84),
+                    fill = "royal blue", 
+                    alpha = 0.5) + 
+        geom_ribbon(aes(x    = year,
                         ymin = p05,
                         ymax = p95),
                     fill = "royal blue", 
-                    alpha = 0.5) + 
+                    alpha = 0.3) + 
         geom_line(aes(x = year, y = p50)) + 
         geom_hline(yintercept = 0, linetype = "dashed") + 
         labs(x = "Year", 
@@ -94,6 +101,9 @@ plot.dynamic <-
       }
     }
   }
+  
+  # arrange the layout
+  g.all <- g.all + plot_layout(nrow = 2)
   
   # save under the 6_output folder
   ggsave(plot = g.all, 
