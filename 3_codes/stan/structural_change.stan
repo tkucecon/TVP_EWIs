@@ -2,6 +2,7 @@
 // -----------------------------------------------------------------------------
 // About this code
 // Estimate a logit model without time-varying coefficients
+// Allow for a discontinuous structural change of parameters
 // -----------------------------------------------------------------------------
 
 // input data
