@@ -41,12 +41,15 @@ predictMCMC <-
       
       # combine with the output data frame
       if (i == 1) {
+        # the first column corresponds to the intercept
         colnames(df.b_i) <- c("year", "intercept")
+        # save as the output file
         df.beta <- df.b_i
       }else{
         # check the name of the current variable
         varname <- varnames[i]
         colnames(df.b_i) <- c("year", varname)
+        # merge with the output file
         df.beta <- 
           left_join(df.beta, df.b_i, by = "year")
       }
@@ -80,7 +83,7 @@ predictMCMC <-
     
     # combine with the true crisis data and save as a data frame
     df.pred <- 
-      data.frame(crisis    = mat.Y, 
+      data.frame(crisis    = as.numeric(mat.Y), 
                  pred.MCMC = mat.prob)
     
     # return 

@@ -42,7 +42,7 @@
            starts_with("level.slope"),
            starts_with("growth.cpi"),
            starts_with("diff.money"),
-           starts_with("growth.equity"),
+           # starts_with("growth.equity"),
            starts_with("diff.iy"),
            diff.ca.dom,
            diff.dsr.dom,
@@ -68,18 +68,18 @@
 # estimate MCMC using the training sample and obtain the estimates of beta
 # ------------------------------------------------------------------------------
   
-  # # gaussian transition with df.crisis.baseline.train
-  # saveMCMC(df        = df.crisis.baseline.train,
-  #          target    = "crisis",
-  #          stan.file = "gaussian.stan",
-  #          MCMC.name = "gaussian_crisis_baseline_train2000.rda")
-  # 
-  # # check the result of MCMC
-  # plot.heat(MCMC.name  = "gaussian_crisis_baseline_train2000.rda",
-  #           graph.name = "gaussian_crisis_baseline_heat_train2000.pdf")
-  # 
-  # plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train2000.rda",
-  #              graph.name = "gaussian_crisis_baseline_ts_train2000.pdf")
+  # gaussian transition with df.crisis.baseline.train
+  saveMCMC(df        = df.crisis.baseline.train,
+           target    = "crisis",
+           stan.file = "gaussian.stan",
+           MCMC.name = "gaussian_crisis_baseline_train2000_woequity.rda")
+
+  # check the result of MCMC
+  plot.heat(MCMC.name  = "gaussian_crisis_baseline_train2000_woequity.rda",
+            graph.name = "gaussian_crisis_baseline_heat_train2000_woequity.pdf")
+
+  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train2000_woequity.rda",
+               graph.name = "gaussian_crisis_baseline_ts_train2000_woequity.pdf")
   
 # ------------------------------------------------------------------------------
 # obtain out of sample for MCMC
@@ -87,29 +87,38 @@
   
   # obtain out-of-sample predictions with the latest estimates of beta
   df.pred <- 
-    predictMCMC(MCMC.name = "gaussian_crisis_baseline_train2000.rda",
+    predictMCMC(MCMC.name = "gaussian_crisis_baseline_train2000_woequity.rda",
                 df.test   = df.crisis.baseline.test)
   
 # ------------------------------------------------------------------------------
 # estimate a usual logistic regression
 # ------------------------------------------------------------------------------
   
+  # keep only relevant values
+  df.logit.train <- 
+    df.crisis.baseline.train %>% 
+    select(-country, -year)
+
+  df.logit.test <- 
+    df.crisis.baseline.test %>% 
+    select(-country, -year)
+  
   # usual logistic regression
   model.logit <- 
-    glm(crisis ~ . - country - year, data = df.crisis.baseline.train, family = binomial())
+    glm(crisis ~ ., data = df.logit.train, family = binomial())
   
   # check the result
   summary(model.logit)
 
   # predict
   pred.logit <- 
-    predict(model.logit, newdata = df.crisis.baseline.test, type = "response")
+    predict(model.logit, newdata = df.logit.test, type = "response")
   
   # bind the result to df.pred
   df.pred <- 
     df.pred %>% 
     cbind(pred.logit)
-
+  
 # ------------------------------------------------------------------------------
 # estimate a LASSO logistic regression
 # ------------------------------------------------------------------------------
@@ -140,9 +149,12 @@
   # install packages
   library("glmnet")
   
+  # set the seed
+  set.seed(2292)
+  
   # conduct cross validation to decide lambda
   cv.lambda.lasso <- 
-    cv.glmnet(x = X.crisis.baseline.train, 
+    cv.glmnet(x = cbind(1, X.crisis.baseline.train), # intercept should be added
               y = Y.crisis.baseline.train, 
               alpha = 1,
               family = "binomial")
@@ -155,7 +167,7 @@
   
   # LASSO logistic regression
   model.lasso <- 
-    glmnet(x = X.crisis.baseline.train,
+    glmnet(x = cbind(1, X.crisis.baseline.train),
            y = Y.crisis.baseline.train, 
            alpha = 1,
            family = "binomial",
@@ -167,21 +179,44 @@
   # predict and assess the out-of-sample prediction 
   pred.lasso <- 
     predict.glmnet(model.lasso,
-                   newx = X.crisis.baseline.test)
+                   newx = cbind(1, X.crisis.baseline.test))
 
   # change into probability
   pred.lasso <-  exp(pred.lasso) / (1 + exp(pred.lasso))
-  
-  # assess.lasso <- 
-  #   assess.glmnet(model.lasso,
-  #                 newx = X.crisis.baseline.test,
-  #                 newy = Y.crisis.baseline.test)
   
   # bind the result to df.pred
   df.pred <- 
     df.pred %>% 
     cbind(pred.lasso) %>% 
     rename(pred.lasso = s0)
+
+# ------------------------------------------------------------------------------
+# Compare the coefficients
+# ------------------------------------------------------------------------------
+  
+  # save the coefficients
+  # coef.MCMC  <- as.numeric(mat.beta.last)
+  coef.logit <- model.logit$coefficients
+  coef.lasso <- as.numeric(model.lasso$beta)
+
+  # # combine the coefficients
+  # df.coefs <- 
+  #   cbind(coef.MCMC, coef.logit, coef.lasso, varname) %>% 
+  #   as.data.frame() 
+  # 
+  # # obtain the name of variables
+  # varnames <- rownames(df.coefs)
+  # 
+  # # create a column of variable name
+  # df.coefs <- 
+  #   cbind(df.coefs, varnames) %>% 
+  #   as_tibble()
+  # 
+  # # plot 
+  # df.coefs %>% 
+  #   gather(key = "key", value = "value", -varnames) %>% 
+  #   ggplot() + 
+  #   geom_point(aes(x = value, y = varnames, color = key))
   
 # ------------------------------------------------------------------------------
 # Plot ROC curves
@@ -196,7 +231,7 @@
   roc.lasso <- roc(df.pred, crisis, pred.lasso)
   
   # save the following pdf file
-  pdf(file   = "../6_outputs/roc_2000.pdf",
+  pdf(file   = "../6_outputs/roc_2000_woequity.pdf",
       width  = 6,
       height = 4)
   
