@@ -114,6 +114,8 @@
       growth.hpreal = level.hpreal / lag(level.hpreal, n = 2) * 100 - 100, # growth rate of the real house prices
       growth.equity = ((1 + eq_tr) * (1 + lag(eq_tr, n = 1)) - 1) * 100    # growth rate of the equity price
            ) %>% 
+    # adjust the equity growth with CPI growth
+    mutate(growth.equity = growth.equity - growth.cpi) %>% 
     # winsorize the variables and remove the effects of outliers
     mutate(growth.cpi    = Winsorize(growth.cpi,    probs = c(0.05, 0.95), na.rm = TRUE),
            growth.rcon   = Winsorize(growth.rcon,   probs = c(0.05, 0.95), na.rm = TRUE),
@@ -121,6 +123,12 @@
            growth.equity = Winsorize(growth.equity, probs = c(0.05, 0.95), na.rm = TRUE)
            ) %>% 
     select(year, country, starts_with("growth"))
+  
+  # This growth rates sometimes contain extreme values... check graphically
+  df.JST.growth %>% 
+    gather(key = "key", value = "value", starts_with("growth")) %>% 
+    ggplot() + 
+    geom_density(aes(x = value, color = key))
   
   # Define some variables as the gap from HP filtered series
   df.JST.gap <- 
