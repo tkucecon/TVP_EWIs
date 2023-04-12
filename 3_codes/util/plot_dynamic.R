@@ -53,8 +53,8 @@ plot.dynamic <-
     significance <- 
       df.b_i %>% 
       mutate(significance = case_when(
-        p05 > 0 ~ 1,
-        p95 < 0 ~ 1,
+        p16 > 0 ~ 1,
+        p84 < 0 ~ 1,
         TRUE    ~ 0
       )) %>% 
       summarise(significance = max(significance, na.rm = TRUE)) %>% 
