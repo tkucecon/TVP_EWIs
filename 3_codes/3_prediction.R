@@ -42,11 +42,11 @@
            starts_with("level.slope"),
            starts_with("growth.cpi"),
            starts_with("diff.money"),
-           # starts_with("growth.equity"),
+           starts_with("growth.equity"),
+           starts_with("growth.hpreal"),
            starts_with("diff.iy"),
            diff.ca.dom,
            diff.dsr.dom,
-           growth.hpreal.dom,
            # bank balance sheet variables
            starts_with("level.lev")
     ) %>% 
@@ -72,23 +72,27 @@
   saveMCMC(df        = df.crisis.baseline.train,
            target    = "crisis",
            stan.file = "gaussian.stan",
-           MCMC.name = "gaussian_crisis_baseline_train2000_woequity.rda")
+           MCMC.name = "gaussian_crisis_baseline_train2000.rda")
 
   # check the result of MCMC
-  plot.heat(MCMC.name  = "gaussian_crisis_baseline_train2000_woequity.rda",
-            graph.name = "gaussian_crisis_baseline_heat_train2000_woequity.pdf")
+  plot.heat(MCMC.name  = "gaussian_crisis_baseline_train2000.rda",
+            graph.name = "gaussian_crisis_baseline_heat_train2000.pdf")
 
-  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train2000_woequity.rda",
-               graph.name = "gaussian_crisis_baseline_ts_train2000_woequity.pdf")
+  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train2000.rda",
+               graph.name = "gaussian_crisis_baseline_ts_train2000.pdf")
   
 # ------------------------------------------------------------------------------
 # obtain out of sample for MCMC
 # ------------------------------------------------------------------------------
   
   # obtain out-of-sample predictions with the latest estimates of beta
-  df.pred <- 
-    predictMCMC(MCMC.name = "gaussian_crisis_baseline_train2000_woequity.rda",
+  out.pred <- 
+    predictMCMC(MCMC.name = "gaussian_crisis_baseline_train2000.rda",
                 df.test   = df.crisis.baseline.test)
+  
+  # unlist
+  df.pred.MCMC <- out.pred[[1]]
+  df.beta.MCMC <- out.pred[[2]]
   
 # ------------------------------------------------------------------------------
 # estimate a usual logistic regression
@@ -113,11 +117,6 @@
   # predict
   pred.logit <- 
     predict(model.logit, newdata = df.logit.test, type = "response")
-  
-  # bind the result to df.pred
-  df.pred <- 
-    df.pred %>% 
-    cbind(pred.logit)
   
 # ------------------------------------------------------------------------------
 # estimate a LASSO logistic regression
@@ -184,43 +183,56 @@
   # change into probability
   pred.lasso <-  exp(pred.lasso) / (1 + exp(pred.lasso))
   
-  # bind the result to df.pred
-  df.pred <- 
-    df.pred %>% 
-    cbind(pred.lasso) %>% 
-    rename(pred.lasso = s0)
-
 # ------------------------------------------------------------------------------
 # Compare the coefficients
 # ------------------------------------------------------------------------------
   
   # save the coefficients
-  # coef.MCMC  <- as.numeric(mat.beta.last)
-  coef.logit <- model.logit$coefficients
-  coef.lasso <- as.numeric(model.lasso$beta)
-
-  # # combine the coefficients
-  # df.coefs <- 
-  #   cbind(coef.MCMC, coef.logit, coef.lasso, varname) %>% 
-  #   as.data.frame() 
-  # 
-  # # obtain the name of variables
-  # varnames <- rownames(df.coefs)
-  # 
-  # # create a column of variable name
-  # df.coefs <- 
-  #   cbind(df.coefs, varnames) %>% 
-  #   as_tibble()
-  # 
-  # # plot 
-  # df.coefs %>% 
-  #   gather(key = "key", value = "value", -varnames) %>% 
-  #   ggplot() + 
-  #   geom_point(aes(x = value, y = varnames, color = key))
+  df.beta.logit <- 
+    data.frame(median = model.logit$coefficients,
+               se   = sqrt(diag(vcov(model.logit)))) %>% 
+    mutate(p16 = median - se,
+           p84 = median + se) %>% 
+    mutate(varname = df.beta.MCMC$varname) %>% 
+    select(varname, p16, median, p84) %>% 
+    mutate(method = "logit") %>% 
+    as_tibble()
   
+  df.beta.lasso <- 
+    as.numeric(model.lasso$beta) %>% 
+    as_tibble() %>% 
+    rename(median = value) %>% 
+    mutate(varname = df.beta.MCMC$varname,
+           p16 = NA,
+           p84 = NA,
+           method = "LASSO") %>% 
+    select(varname, p16, median, p84, method) 
+    
+  # combine the coefficients
+  df.betas <-
+    df.beta.MCMC %>% 
+    mutate(method = "MCMC") %>% 
+    rbind(df.beta.logit, df.beta.lasso) %>%
+    as_tibble()
+
+  # plot
+  df.betas %>%
+    filter(varname != "intercept") %>% 
+    ggplot(aes(y = varname, color = method)) +
+    geom_point(aes(x = median)) + 
+    geom_errorbarh(aes(xmin = p16, xmax = p84))
+
 # ------------------------------------------------------------------------------
 # Plot ROC curves
 # ------------------------------------------------------------------------------
+  
+  # bind the result to df.pred
+  df.pred <- 
+    df.pred.MCMC %>% 
+    rename(pred.MCMC = median) %>% 
+    cbind(pred.logit) %>% 
+    cbind(pred.lasso) %>% 
+    rename(pred.lasso = s0)
   
   # install package
   library("pROC")
@@ -231,7 +243,7 @@
   roc.lasso <- roc(df.pred, crisis, pred.lasso)
   
   # save the following pdf file
-  pdf(file   = "../6_outputs/roc_2000_woequity.pdf",
+  pdf(file   = "../6_outputs/roc_2000.pdf",
       width  = 6,
       height = 4)
   
@@ -253,3 +265,50 @@
   auc(roc.MCMC)
   auc(roc.logit)
   auc(roc.lasso)
+  
+  
+# ------------------------------------------------------------------------------
+# Plot PR curves
+# ------------------------------------------------------------------------------
+  
+  # prediction data frame
+  df.pred <- 
+    df.pred %>% 
+    mutate(crisis = as.factor(crisis))
+  
+  # check the precision
+  df.pr.auc.MCMC <- 
+    df.pred %>% 
+    yardstick::pr_auc(truth = crisis, pred.MCMC) %>% 
+    mutate(method = "MCMC")
+  
+  df.pr.auc.logit <- 
+    df.pred %>% 
+    yardstick::pr_auc(truth = crisis, pred.logit) %>% 
+    mutate(method = "logit")
+  
+  df.pr.auc.lasso <- 
+    df.pred %>% 
+    yardstick::pr_auc(truth = crisis, pred.lasso) %>% 
+    mutate(method = "LASSO")
+  
+  # combine all
+  df.pr.auc <- 
+    rbind(df.pr.auc.MCMC, df.pr.auc.logit, df.pr.auc.lasso)
+  
+  # plot the comparison of AUC of PR curves
+  g.pr.auc <- 
+    df.pr.auc %>% 
+    ggplot() + 
+    geom_bar(mapping = aes(x = reorder(x = method, X = .estimate), 
+                           y = .estimate), 
+             stat    = "identity") + 
+    labs(x = "method", 
+         y = "AUC of PR curves")
+  
+  # save the result
+  ggsave(filename = "../6_outputs/AUC_pr_2000.pdf",
+         plot     = g.pr.auc,
+         width    = 6 ,
+         height   = 4)
+  

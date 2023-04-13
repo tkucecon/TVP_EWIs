@@ -23,6 +23,7 @@ predictMCMC <-
     
     # name of covariates
     varnames <- colnames(out.stan[[1]]$X)
+    varnames[1] <- "intercept"
     
     # obtain the median of beta
     for (i in 1:p) {
@@ -35,32 +36,32 @@ predictMCMC <-
         mutate(time.id = row_number()) %>% 
         gather(key = iter, value = value, -time.id) %>% 
         group_by(time.id) %>% 
-        summarise(median = quantile(value, 0.5)) %>% 
+        summarise(
+          p16    = quantile(value, 0.16),
+          median = quantile(value, 0.5),
+          p84    = quantile(value, 0.84)
+          ) %>% 
         left_join(df.time.id, by = "time.id") %>% 
-        dplyr::select(year, median)
+        dplyr::select(year, median, p16, p84) %>% 
+        mutate(varname = varnames[i])
       
       # combine with the output data frame
       if (i == 1) {
-        # the first column corresponds to the intercept
-        colnames(df.b_i) <- c("year", "intercept")
         # save as the output file
         df.beta <- df.b_i
       }else{
-        # check the name of the current variable
-        varname <- varnames[i]
-        colnames(df.b_i) <- c("year", varname)
         # merge with the output file
         df.beta <- 
-          left_join(df.beta, df.b_i, by = "year")
+          rbind(df.beta, df.b_i)
       }
     }
     
     # obtain the latest median estimates of beta
     mat.beta.last <- 
       df.beta %>% 
-      tail(n = 1) %>% 
-      select(-year) %>% 
-      t()
+      filter(year == max(year)) %>% 
+      select(median) %>% 
+      as.matrix()
     
     # obtain Y and X as matrix
     mat.X <- 
@@ -86,6 +87,15 @@ predictMCMC <-
       data.frame(crisis    = as.numeric(mat.Y), 
                  pred.MCMC = mat.prob)
     
+    # create a data frame of coefficients in the final year
+    df.beta.last <- 
+      df.beta %>% 
+      filter(year == max(year)) %>% 
+      select(varname, p16, median, p84)
+    
+    # output list
+    out.list <- list(df.pred, df.beta.last)
+    
     # return 
-    return(df.pred)
+    return(out.list)
 }
