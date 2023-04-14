@@ -15,7 +15,7 @@ This code downloads the two data set
 - df.JST: contains raw values
 - df.JST.normalized: contains normalized explanatory variables (mean=0, sd=1)
 
-The data process is based on Bluwstein et al. (2022)^[2]. See the data section of the paper for the definition of each variable.
+The data process is based on Bluwstein et al. (2022)[^2]. See the data section of the paper for the definition of each variable.
 [^2]: Bluwstein, Kristina, et al. "Credit growth, the yield curve and financial crisis prediction: Evidence from a machine learning approach." (2021).
 
 ## 2_fitstan.r
