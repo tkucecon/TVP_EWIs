@@ -8,47 +8,35 @@ plot.dynamic <-
   function(MCMC.name,
            graph.name){
   
-  # load the MCMC data and extract necessary information
+  # load the MCMC result
   load(paste("../5_tmp/", MCMC.name, sep = ""))
-  
-  # extracted data 
-  extracted.stan <- 
-    extract(out.stan[[2]])
-  
-  # correspondence data frame between time id and year
-  df.time.id <- out.stan[[3]]
-  
-  # number of covariates
-  p <- out.stan[[1]]$p
-  
-  # name of covariates: 
-  varnames <- colnames(out.stan[[1]]$X)
     
   # clean up the global environment to avoid conflicts
   if (exists("g.all")) {
     rm(g.all)
   }
     
+  # obtain the variable name
+  varnames <- 
+    df.beta %>% 
+    select(varname) %>% 
+    unique() %>% 
+    unlist()
+  
+  # number of variables
+  p <- length(varnames)
+  
   # repeat for all the variables
   for (i in 2:p) {
+    
     # check the name of the current variable
-    varname <- varnames[i]
+    current.var <- varnames[i]
     
-    # check the dynamics of the series
+    # keep only the current variable
     df.b_i <- 
-      extracted.stan$beta[, i, ] %>% 
-      t() %>% 
-      as_tibble() %>% 
-      mutate(time.id = row_number()) %>% 
-      gather(key = iter, value = value, -time.id) %>% 
-      group_by(time.id) %>% 
-      summarise(p05 = quantile(value, 0.05),
-                p16 = quantile(value, 0.16),
-                p50 = quantile(value, 0.5),
-                p84 = quantile(value, 0.84),
-                p95 = quantile(value, 0.95)) %>% 
-      left_join(df.time.id, by = "time.id")
-    
+      df.beta %>% 
+      filter(varname == current.var)
+      
     # check if there are some significant periods
     significance <- 
       df.b_i %>% 
@@ -65,7 +53,7 @@ plot.dynamic <-
       df.b_i %>% 
       complete(year = full_seq(year, 1))
     
-    # plot if the series contains significant periods
+    # plot if the series contains significant periods and skip otherwise
     # skip otherwise
     if (significance == 1) {
       # plot the current variable
@@ -88,10 +76,10 @@ plot.dynamic <-
                         ymax = p95),
                     fill = "royal blue", 
                     alpha = 0.3) + 
-        geom_line(aes(x = year, y = p50)) + 
+        geom_line(aes(x = year, y = median)) + 
         geom_hline(yintercept = 0, linetype = "dashed") + 
         labs(x = "Year", 
-             y = varname)
+             y = current.var)
       
       # combine with the graph output file
       if (exists("g.all")) {

@@ -18,10 +18,11 @@
   source("util/saveMCMC.r")
   source("util/plot_dynamic.r")
   source("util/plot_heat.r")
+  source("util/plot_comparison.r")
   source("util/predictMCMC.r")
-  
+
 # set the parallel computation option-------------------------------------------
-  
+
   # set options
   # rstan_options(auto_write = TRUE)
   options(mc.cores = parallel::detectCores()) 
@@ -40,20 +41,20 @@
            # macro variables
            starts_with("diff.credit"),
            starts_with("level.slope"),
-           starts_with("growth.cpi"),
            starts_with("diff.money"),
-           starts_with("growth.equity"),
            starts_with("growth.hpreal"),
            starts_with("diff.iy"),
+           growth.cpi.dom,
+           growth.equity.dom,
            diff.ca.dom,
            diff.dsr.dom,
            # bank balance sheet variables
-           starts_with("level.lev")
+           level.lev.dom
     ) %>% 
     na.omit()
   
   # specify the reference year
-  ref.year <- 2000
+  ref.year <- 1990
   
   # Split the data into training/test data set
   df.crisis.baseline.train <- 
@@ -70,29 +71,24 @@
   
   # gaussian transition with df.crisis.baseline.train
   saveMCMC(df        = df.crisis.baseline.train,
-           target    = "crisis",
            stan.file = "gaussian.stan",
-           MCMC.name = "gaussian_crisis_baseline_train2000.rda")
+           MCMC.name = "gaussian_crisis_baseline_train1990.rda")
 
   # check the result of MCMC
-  plot.heat(MCMC.name  = "gaussian_crisis_baseline_train2000.rda",
-            graph.name = "gaussian_crisis_baseline_heat_train2000.pdf")
+  plot.heat(MCMC.name  = "gaussian_crisis_baseline_train1990.rda",
+            graph.name = "gaussian_crisis_baseline_heat_train1990.pdf")
 
-  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train2000.rda",
-               graph.name = "gaussian_crisis_baseline_ts_train2000.pdf")
+  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train1990.rda",
+               graph.name = "gaussian_crisis_baseline_ts_train1990.pdf")
   
 # ------------------------------------------------------------------------------
-# obtain out of sample for MCMC
+# obtain out of sample prediction for MCMC
 # ------------------------------------------------------------------------------
   
   # obtain out-of-sample predictions with the latest estimates of beta
-  out.pred <- 
-    predictMCMC(MCMC.name = "gaussian_crisis_baseline_train2000.rda",
+  df.pred.MCMC <- 
+    predictMCMC(MCMC.name = "gaussian_crisis_baseline_train1990.rda",
                 df.test   = df.crisis.baseline.test)
-  
-  # unlist
-  df.pred.MCMC <- out.pred[[1]]
-  df.beta.MCMC <- out.pred[[2]]
   
 # ------------------------------------------------------------------------------
 # estimate a usual logistic regression
@@ -184,44 +180,52 @@
   pred.lasso <-  exp(pred.lasso) / (1 + exp(pred.lasso))
   
 # ------------------------------------------------------------------------------
-# Compare the coefficients
+# Create a data frame containing all betas
 # ------------------------------------------------------------------------------
   
-  # save the coefficients
+  # obtain the historical beta of MCMC
+  load("../5_tmp/gaussian_crisis_baseline_train1990.rda")
+  
+  # obtain the beta of logistic regression
   df.beta.logit <- 
-    data.frame(median = model.logit$coefficients,
-               se   = sqrt(diag(vcov(model.logit)))) %>% 
-    mutate(p16 = median - se,
-           p84 = median + se) %>% 
-    mutate(varname = df.beta.MCMC$varname) %>% 
-    select(varname, p16, median, p84) %>% 
-    mutate(method = "logit") %>% 
+    data.frame(logit       = model.logit$coefficients,
+               varname.raw = names(model.logit$coefficients)) %>% 
+    mutate(varname = ifelse(varname.raw == "(Intercept)", "intercept", varname.raw)) %>% 
+    select(varname, logit) %>% 
+    as_tibble()
+
+  # obtain the beta of lasso regression
+  df.beta.lasso <- 
+    data.frame(
+      LASSO = as.numeric(model.lasso$beta),
+      varname.raw = model.lasso$beta@Dimnames[[1]]
+    ) %>% 
+    mutate(varname = ifelse(varname.raw == "", "intercept", varname.raw)) %>% 
+    select(varname, LASSO) %>% 
     as_tibble()
   
-  df.beta.lasso <- 
-    as.numeric(model.lasso$beta) %>% 
-    as_tibble() %>% 
-    rename(median = value) %>% 
-    mutate(varname = df.beta.MCMC$varname,
-           p16 = NA,
-           p84 = NA,
-           method = "LASSO") %>% 
-    select(varname, p16, median, p84, method) 
-    
   # combine the coefficients
-  df.betas <-
-    df.beta.MCMC %>% 
-    mutate(method = "MCMC") %>% 
-    rbind(df.beta.logit, df.beta.lasso) %>%
-    as_tibble()
+  df.beta.all <-
+    df.beta %>% 
+    left_join(df.beta.logit, by = "varname") %>% 
+    left_join(df.beta.lasso, by = "varname") 
 
-  # plot
-  df.betas %>%
-    filter(varname != "intercept") %>% 
-    ggplot(aes(y = varname, color = method)) +
-    geom_point(aes(x = median)) + 
-    geom_errorbarh(aes(xmin = p16, xmax = p84))
-
+# ------------------------------------------------------------------------------
+# Plot and compare the coefficients of some variables
+# ------------------------------------------------------------------------------
+  
+  # Compare the coefficients
+  g.comparison <- 
+    plot.comparison(df.beta.all, "diff.credit.dom", "none") +
+    plot.comparison(df.beta.all, "diff.money.glo", "none") +
+    plot.comparison(df.beta.all, "diff.money.dom", c(0.75, 0.8))
+  
+  # save the result
+  ggsave(filename = "../6_outputs/compare_1990.pdf",
+         plot     = g.comparison,
+         width    = 10 ,
+         height   = 4)
+  
 # ------------------------------------------------------------------------------
 # Plot ROC curves
 # ------------------------------------------------------------------------------
@@ -229,7 +233,6 @@
   # bind the result to df.pred
   df.pred <- 
     df.pred.MCMC %>% 
-    rename(pred.MCMC = median) %>% 
     cbind(pred.logit) %>% 
     cbind(pred.lasso) %>% 
     rename(pred.lasso = s0)
@@ -243,7 +246,7 @@
   roc.lasso <- roc(df.pred, crisis, pred.lasso)
   
   # save the following pdf file
-  pdf(file   = "../6_outputs/roc_2000.pdf",
+  pdf(file   = "../6_outputs/roc_1990.pdf",
       width  = 6,
       height = 4)
   
@@ -252,7 +255,7 @@
   plot(roc.logit, add = TRUE, lty = 2, col = "blue")
   plot(roc.lasso, add = TRUE, lty = 3, col = "red")
   legend("topright", 
-         c("MCMC", "Logit", "LASSO"),
+         c("Bayesian", "Logit", "LASSO"),
          lty = c(1, 2, 3),
          col = c("black", "blue", "red"),
          bty = "n"
@@ -307,7 +310,7 @@
          y = "AUC of PR curves")
   
   # save the result
-  ggsave(filename = "../6_outputs/AUC_pr_2000.pdf",
+  ggsave(filename = "../6_outputs/AUC_pr_1990.pdf",
          plot     = g.pr.auc,
          width    = 6 ,
          height   = 4)

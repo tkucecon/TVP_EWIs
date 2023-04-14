@@ -41,15 +41,15 @@
            # macro variables
            starts_with("diff.credit"),
            starts_with("level.slope"),
-           starts_with("growth.cpi"),
            starts_with("diff.money"),
-           starts_with("growth.equity"),
            starts_with("growth.hpreal"),
            starts_with("diff.iy"),
+           growth.cpi.dom,
+           growth.equity.dom,
            diff.ca.dom,
            diff.dsr.dom,
            # bank balance sheet variables
-           starts_with("level.lev")
+           level.lev.dom
            ) %>% 
     na.omit()
   
@@ -59,13 +59,11 @@
   
   # 1. gaussian transition with df.crisis.baseline: horseshoe prior
   saveMCMC(df        = df.crisis.baseline,
-           target    = "crisis",
            stan.file = "gaussian.stan",
            MCMC.name = "gaussian_crisis_baseline.rda")
 
   # 2. gaussian transition with df.crisis.baseline: NGG prior
   saveMCMC(df        = df.crisis.baseline,
-           target    = "crisis",
            stan.file = "normal-gamma-gamma.stan",
            MCMC.name = "NGG_crisis_baseline.rda")
   
