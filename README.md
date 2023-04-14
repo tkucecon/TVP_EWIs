@@ -15,11 +15,12 @@ This code downloads the two data set
 - df.JST: contains raw values
 - df.JST.normalized: contains normalized explanatory variables (mean=0, sd=1)
 
-See the data section of the paper for the definition of each variable
+The data process is based on Bluwstein et al. (2022)^[2]. See the data section of the paper for the definition of each variable.
+[^2]: Bluwstein, Kristina, et al. "Credit growth, the yield curve and financial crisis prediction: Evidence from a machine learning approach." (2021).
 
 ## 2_fitstan.r
 This is the main code to estimate a sparse dynamic logistic regression model and for some robustness checks. The baseline logistic model assumes that 
-$$q_{i,t} = X_{i,t}\beta_t + \varepsilon_{i,t}$$
+$$q_{i,t} = X_{i,t}\beta_t$$
 where $q_{i,t}$ is the logit transformed probability of financial crisis ($Pr[crisis_{i,t}]$). 
 
 Linear models for the robustness check assumes that 
@@ -30,10 +31,10 @@ The structure of state equation differs according to the stan file (gaussian ran
 
 ## stan/gaussian.stan
 Stan code to run MCMC estimation for the baseline model. Here I assume that the coefficients are identical across countries contemporally, but evolves over time following a random walk with Gaussian errors (state equation), namely
-$$\beta_t \sim N(\beta_{t-1}, \sigma)$$
-This state equation implicitly assumes that the coefficients smoothly and slowly evolves over time. To avoid the problem of over-fitting and allow for sparsity, Horseshoe priors are assumed for both $\beta_0$ and $\sigma$. For the estimation of TVP models under the assumption of sparsity, see Bitto and Fruhwirth-Schnatter (2019)[^2].
+$$\beta_t \sim N(\beta_{t-1}, Q)$$
+This state equation implicitly assumes that the coefficients smoothly and slowly evolves over time. To avoid the problem of over-fitting and allow for sparsity, Horseshoe priors are assumed for both $\beta_0$ and $Q$. For the estimation of TVP models under the assumption of sparsity, see Bitto and Fruhwirth-Schnatter (2019)[^3].
 
-[^2]: Bitto, Angela, and Sylvia Frühwirth-Schnatter. "Achieving shrinkage in a time-varying parameter model framework." Journal of Econometrics 210.1 (2019): 75-97.
+[^3]: Bitto, Angela, and Sylvia Frühwirth-Schnatter. "Achieving shrinkage in a time-varying parameter model framework." Journal of Econometrics 210.1 (2019): 75-97.
 
 ## util/plot_heat.r
 A function to plot a heat-map of the time-varying coefficients. 
