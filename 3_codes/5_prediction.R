@@ -70,16 +70,16 @@
 # ------------------------------------------------------------------------------
   
   # gaussian transition with df.crisis.baseline.train
-  saveMCMC(df        = df.crisis.baseline.train,
-           stan.file = "gaussian.stan",
-           MCMC.name = "gaussian_crisis_baseline_train1990.rda")
-
-  # check the result of MCMC
-  plot.heat(MCMC.name  = "gaussian_crisis_baseline_train1990.rda",
-            graph.name = "gaussian_crisis_baseline_heat_train1990.pdf")
-
-  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train1990.rda",
-               graph.name = "gaussian_crisis_baseline_ts_train1990.pdf")
+  # saveMCMC(df        = df.crisis.baseline.train,
+  #          stan.file = "gaussian.stan",
+  #          MCMC.name = "gaussian_crisis_baseline_train1990.rda")
+  # 
+  # # check the result of MCMC
+  # plot.heat(MCMC.name  = "gaussian_crisis_baseline_train1990.rda",
+  #           graph.name = "gaussian_crisis_baseline_heat_train1990.pdf")
+  # 
+  # plot.dynamic(MCMC.name  = "gaussian_crisis_baseline_train1990.rda",
+  #              graph.name = "gaussian_crisis_baseline_ts_train1990.pdf")
   
 # ------------------------------------------------------------------------------
 # obtain out of sample prediction for MCMC
@@ -89,7 +89,7 @@
   df.pred.MCMC <- 
     predictMCMC(MCMC.name = "gaussian_crisis_baseline_train1990.rda",
                 df.test   = df.crisis.baseline.test)
-  
+
 # ------------------------------------------------------------------------------
 # estimate a usual logistic regression
 # ------------------------------------------------------------------------------
@@ -254,8 +254,10 @@
   plot(roc.MCMC)
   plot(roc.logit, add = TRUE, lty = 2, col = "blue")
   plot(roc.lasso, add = TRUE, lty = 3, col = "red")
-  legend("topright", 
-         c("Bayesian", "Logit", "LASSO"),
+  legend("bottomright", 
+         c(paste("Bayesian (", round(auc(roc.MCMC), 2), ")", sep = ""),
+           paste("Logit (", round(auc(roc.logit), 2), ")" , sep = ""), 
+           paste("LASSO (", round(auc(roc.lasso), 2), ")" , sep = "")),
          lty = c(1, 2, 3),
          col = c("black", "blue", "red"),
          bty = "n"
@@ -268,36 +270,62 @@
   auc(roc.MCMC)
   auc(roc.logit)
   auc(roc.lasso)
-  
-  
+
 # ------------------------------------------------------------------------------
 # Plot PR curves
 # ------------------------------------------------------------------------------
   
   # prediction data frame
-  df.pred <- 
+  df.pred.pr <- 
     df.pred %>% 
+    mutate(crisis = 1 - crisis) %>% 
     mutate(crisis = as.factor(crisis))
   
   # check the precision
   df.pr.auc.MCMC <- 
-    df.pred %>% 
+    df.pred.pr %>% 
     yardstick::pr_auc(truth = crisis, pred.MCMC) %>% 
-    mutate(method = "MCMC")
+    mutate(method = "Bayesian")
   
   df.pr.auc.logit <- 
-    df.pred %>% 
+    df.pred.pr %>% 
     yardstick::pr_auc(truth = crisis, pred.logit) %>% 
     mutate(method = "logit")
   
   df.pr.auc.lasso <- 
-    df.pred %>% 
+    df.pred.pr %>% 
     yardstick::pr_auc(truth = crisis, pred.lasso) %>% 
     mutate(method = "LASSO")
   
   # combine all
   df.pr.auc <- 
     rbind(df.pr.auc.MCMC, df.pr.auc.logit, df.pr.auc.lasso)
+  
+  # plot the ROC curves
+  df.pred.pr %>% 
+    yardstick::roc_curve(crisis, pred.MCMC) %>% 
+    autoplot()
+  df.pred.pr %>% 
+    yardstick::roc_curve(crisis, pred.logit) %>% 
+    autoplot()
+  df.pred.pr %>% 
+    yardstick::roc_curve(crisis, pred.lasso) %>% 
+    autoplot()
+  
+  # plot the PR curves
+  pr.MCMC <- 
+    df.pred.pr %>% 
+    yardstick::pr_curve(crisis, pred.MCMC) %>% 
+    autoplot()
+  
+  pr.logit <- 
+    df.pred.pr %>% 
+    yardstick::pr_curve(crisis, pred.logit) %>% 
+    autoplot()
+  pr.lasso <- 
+    df.pred.pr %>% 
+    yardstick::pr_curve(crisis, pred.lasso) %>% 
+    autoplot()
   
   # plot the comparison of AUC of PR curves
   g.pr.auc <- 
@@ -314,4 +342,33 @@
          plot     = g.pr.auc,
          width    = 6 ,
          height   = 4)
+  
+# ------------------------------------------------------------------------------
+# Confusion matrix
+# ------------------------------------------------------------------------------
+  
+  # MCMC
+  df.pred %>% 
+    mutate(crisis = as.factor(crisis)) %>% 
+    mutate(pred = if_else(pred.MCMC > 0.5, 1, 0)) %>% 
+    mutate(pred = as.factor(pred)) %>% 
+    yardstick::conf_mat(truth    = crisis,
+                        estimate = pred)
+  
+  # logit
+  df.pred %>% 
+    mutate(crisis = as.factor(crisis)) %>% 
+    mutate(pred = if_else(pred.logit > 0.5, 1, 0)) %>% 
+    mutate(pred = as.factor(pred)) %>% 
+    yardstick::conf_mat(truth    = crisis,
+                        estimate = pred)
+
+  # LASSO
+  df.pred %>% 
+    mutate(crisis = as.factor(crisis)) %>% 
+    mutate(pred = if_else(pred.lasso > 0.5, 1, 0)) %>% 
+    mutate(pred = as.factor(pred)) %>% 
+    yardstick::conf_mat(truth    = crisis,
+                        estimate = pred)
+  
   
