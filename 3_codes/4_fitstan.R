@@ -26,62 +26,45 @@
   options(mc.cores = parallel::detectCores()) 
   
 # ------------------------------------------------------------------------------
-# Load the JST data
+# Load the normalized data
 # ------------------------------------------------------------------------------
   
-  # load the JST data
-  load("../4_data/df_JST_normalized.rda")
-  
-  # keep only the relevant variables and remove NA rows:
-  
-  # data frame 1: crisis dummy with baseline explanatory variables
-  df.crisis.baseline <- 
-    df.JST.normalized %>% 
-    select(year, country, crisis, 
-           # macro variables
-           starts_with("diff.credit"),
-           starts_with("level.slope"),
-           starts_with("diff.money"),
-           starts_with("growth.hpreal"),
-           starts_with("diff.iy"),
-           growth.cpi.dom,
-           growth.equity.dom,
-           diff.ca.dom,
-           diff.dsr.dom,
-           # bank balance sheet variables
-           level.lev.dom
-           ) %>% 
-    na.omit()
+  # load the normalized data
+  load("../4_data/df_normalized.rda")
   
 # ------------------------------------------------------------------------------
 # run MCMC in multiple settings and save under 5_tmp folder
 # ------------------------------------------------------------------------------
   
-  # 1. gaussian transition with df.crisis.baseline: horseshoe prior
-  saveMCMC(df        = df.crisis.baseline,
-           stan.file = "gaussian.stan",
-           MCMC.name = "gaussian_crisis_baseline.rda")
+  # 1. horseshoe prior
+  saveMCMC(df        = df.normalized,
+           stan.file = "horseshoe")
 
-  # 2. gaussian transition with df.crisis.baseline: NGG prior
-  saveMCMC(df        = df.crisis.baseline,
-           stan.file = "normal-gamma-gamma.stan",
-           MCMC.name = "NGG_crisis_baseline.rda")
+  # 2. Normal-Gamma-Gamma prior with estimated hyperparameter
+  saveMCMC(df        = df.normalized,
+           stan.file = "NGG")
+  
+  # 3. Normal-Gamma-Gamma prior with given hyperparameter
+  hyperparams <- 
+    list(a_xi     = 0.1,
+         c_xi     = 0.1,
+         kappa_b  = 100,
+         a_tau    = 0.5,
+         c_tau    = 0.5,
+         lambda_b = 10
+         )
+  
+  saveMCMC(df          = df.normalized,
+           stan.file   = "NGG_manual.stan",
+           hyperparams = hyperparams)
   
 # ------------------------------------------------------------------------------
 # plot the results
 # ------------------------------------------------------------------------------
 
   # 1. gaussian transition with df.crisis.baseline
-  plot.heat(MCMC.name  = "gaussian_crisis_baseline.rda",
-            graph.name = "gaussian_crisis_baseline_heat.pdf")
+  plot.heat(MCMC.name  = "horseshoe.rda",
+            graph.name = "horseshoe_heat.pdf")
   
-  plot.dynamic(MCMC.name  = "gaussian_crisis_baseline.rda",
-               graph.name = "gaussian_crisis_baseline_ts.pdf")
-
-  # 2. gaussian transition with df.crisis.baseline: NGG prior
-  plot.heat(MCMC.name  = "NGG_crisis_baseline.rda",
-            graph.name = "NGG_crisis_baseline_heat.pdf")
-  
-  plot.dynamic(MCMC.name  = "NGG_crisis_baseline.rda",
-               graph.name = "NGG_crisis_baseline_ts.pdf")
-  
+  plot.dynamic(MCMC.name  = "horseshoe.rda",
+               graph.name = "horseshoe_ts.pdf")

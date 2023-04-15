@@ -13,6 +13,14 @@ data {
   matrix[I, p]             X;      // explanatory variable matrix
   int<lower=0, upper=1>    Y[I];   // crisis dummy
   int<lower=1, upper=Tmax> Tid[I]; // time index of each sample
+  // hyperparameters for NGG: theta
+  real<lower=0> a_xi;
+  real<lower=0> c_xi;
+  real<lower=0> kappa_b;
+  // hyperparameters for NGG: the initial value of beta
+  real<lower=0> a_tau;
+  real<lower=0> c_tau;
+  real<lower=0> lambda_b;
 }
 
 // parameters accepted by the model
@@ -26,15 +34,6 @@ parameters {
   // latent parameters for NGG prior: beta
   vector<lower=0>[p] tau;
   vector<lower=0>[p] lambda;
-  // hyperparameters for NGG: theta
-  real<lower=0> a_xi;
-  real<lower=0> c_xi;
-  real<lower=0> kappa_b;
-  // hyperparameters for NGG: the initial value of beta
-  real<lower=0> a_tau;
-  real<lower=0> c_tau;
-  real<lower=0> lambda_b;
-
 }
 
 // transformed parameters

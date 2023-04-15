@@ -124,12 +124,6 @@
            ) %>% 
     select(year, country, starts_with("growth"))
   
-  # This growth rates sometimes contain extreme values... check graphically
-  df.JST.growth %>% 
-    gather(key = "key", value = "value", starts_with("growth")) %>% 
-    ggplot() + 
-    geom_density(aes(x = value, color = key))
-  
   # Define some variables as the gap from HP filtered series
   df.JST.gap <- 
     df.JST.level %>% 
@@ -160,7 +154,9 @@
   df.JST.domestic <- 
     # merge all the data
     df.JST.level %>% 
-    select(-eq_tr) %>% 
+    # keep only necessary level data (drop if before transformation)
+    select(year, country, iso, crisis, crisisJST, level.stir, level.lev, level.ltd, level.noncore, level.slope) %>% 
+    # merge transformed data
     left_join(df.JST.difference, by = c("country", "year")) %>% 
     left_join(df.JST.growth,     by = c("country", "year")) %>% 
     left_join(df.JST.gap,        by = c("country", "year")) %>% 
@@ -176,8 +172,8 @@
     # exclude the crisis year and the four subsequent years
     filter(crisis.ex == 0) %>% 
     # exclude some unusual periods
-    filter(!(year >= 1933 & year <= 1939)) %>% # exclude the great depression period
     filter(!(year >= 1914 & year <= 1918)) %>% # exclude the WW1 period
+    filter(!(year >= 1933 & year <= 1939)) %>% # exclude the great depression period
     filter(!(year >= 1939 & year <= 1945)) %>% # exclude the WW2 period
     # reset the grouping
     ungroup() %>% 
@@ -269,55 +265,14 @@
     ungroup()
   
   # merge with df.JST
-  df.JST <- 
+  df.master <- 
     df.JST %>% 
     left_join(df.BVX, by = c("iso", "year"))
   
-  # save the data
-  save(df.JST, file = "../4_data/df_JST.rda")
-  
 # ------------------------------------------------------------------------------
-# normalize the data: this will be useful to compare the coefficients
+# save the data
 # ------------------------------------------------------------------------------
   
-  # create a recipe to scale the variables
-  recipe.normalize <- 
-    recipe(x = df.JST, formula = as.formula(crisis ~ .)) %>% 
-    # remove some variables from the predictors %>% 
-    update_role(year,             new_role = "time variable") %>% 
-    update_role(country,          new_role = "id variable") %>% 
-    update_role(iso,              new_role = "id variable") %>% 
-    update_role(bank.eq.f1,       new_role = "alternative target") %>% 
-    update_role(bank.eq.f2,       new_role = "alternative target") %>% 
-    # normalize all the predictors to be distributed ~ N(0,1) 
-    step_normalize(all_predictors(), skip = FALSE) %>% 
-    # delete rows with no variance
-    step_zv(all_predictors(), skip = FALSE) 
-  
-  # create an empty data frame to stack the data
-  df.JST.normalized <- 
-    df.JST %>% 
-    filter(country == "hogehoge")
-  
-  # apply the recipe to all countries: now group_by is not allowed for recipes
-  for (target.country in countries.JST) {
-    # create normalized data frame for a specific country
-    df.JST.ctry <- 
-      df.JST %>% 
-      # keep only one specific country
-      filter(country == target.country)
-    
-    # create a data frame with imputed variables
-    df.JST.normalized.tmp <- 
-      recipe.normalize %>% 
-      prep() %>% 
-      bake(new_data = df.JST.ctry)
-
-    # stack the data into the global data frame
-    df.JST.normalized <- 
-      bind_rows(df.JST.normalized, df.JST.normalized.tmp)  
-  }
-  
   # save the data
-  save(df.JST.normalized, file = "../4_data/df_JST_normalized.rda")
+  save(df.master, file = "../4_data/df_master.rda")
   

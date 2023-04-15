@@ -5,10 +5,9 @@
 # ------------------------------------------------------------------------------
 
 saveMCMC <- 
-  function(df,            # data frame: explanatory variables and
-           target,        # binary "crisis" or other numeric variables
-           stan.file,     # name of stan file
-           MCMC.name      # the name of the output file 
+  function(df,                # data frame: explanatory variables and
+           stan.file,         # name of stan file
+           hyperparams = NULL # hyper parameters: default is NULL
            ){
     
 # ------------------------------------------------------------------------------
@@ -32,31 +31,26 @@ saveMCMC <-
   # matrix of explanatory variables
   X.exp <- 
     df %>% 
-    select(-year, -country, -all_of(target), -time.id) %>% 
+    select(-year, -country, -crisis, -time.id) %>% 
     as.matrix()
   
   # add the intercept
   X <- cbind(1, X.exp)
   
-  # vector of independent variable
-  if (target == "crisis") {
-    Y <- 
-      df %>% 
-      select(crisis) %>% 
-      mutate(crisis = as.numeric(crisis) - 1) %>% 
-      unlist() %>% 
-      as.numeric()
-  } else {
-    Y <- 
-      df %>% 
-      select(all_of(target)) %>% 
-      unlist() %>% 
-      as.numeric()
-  }
-  
+  # vector of dependent variable: crisis
+  Y <- 
+    df %>% 
+    select(crisis) %>% 
+    mutate(crisis = as.numeric(crisis) - 1) %>% 
+    unlist() %>% 
+    as.numeric()
+
   # vector of time id
   Tid <- 
     df$time.id
+  
+  # number of variables
+  p <- ncol(X)
   
   # input data
   data.stan <- 
@@ -68,23 +62,128 @@ saveMCMC <-
          Tid      = Tid
     )
   
+  # if hyper-parameter is given, merge with the input data
+  data.stan <- 
+    c(data.stan, hyperparams)
+  
+  # indicate output pars
+  pars <- c("beta", "theta")
+  
+  # if NGG is indicated as the stan file, save the result of hyper-parameter estimation as well
+  if (stan.file == "NGG") {
+    hyper.pars <- c("a_xi", "c_xi", "kappa_b", "a_tau", "c_tau", "lambda_b")
+    pars <- c(pars, hyper.pars)
+  }
+  
 # ------------------------------------------------------------------------------
 # run MCMC
 # ------------------------------------------------------------------------------
   
   # fit the Bayesian model
   fit.stan <- 
-    stan(file       = paste("stan/", stan.file, sep = ""),
+    stan(file       = paste("stan/", stan.file, ".stan", sep = ""),
          data       = data.stan,
-         pars       = c("beta", "theta"),
+         pars       = pars,
          seed       = 2292,
          warmup     = 2000,
          iter       = 3000)
   
-  # create a list of output data
-  out.stan <- list(data.stan, fit.stan, df.time.id)
+  # extract the MCMC result
+  extracted.stan <- 
+    extract(fit.stan)
+  
+# ------------------------------------------------------------------------------
+# Save quantiles of beta
+# ------------------------------------------------------------------------------
+  
+  # name of covariates: 
+  varnames <- colnames(X)
+  varnames[1] <- "intercept"
+  
+  # obtain the quantiles of beta
+  for (i in 1:p) {
+    
+    # check the dynamics of the series
+    df.b_i <- 
+      extracted.stan$beta[, i, ] %>% 
+      t() %>% 
+      as_tibble() %>% 
+      mutate(time.id = row_number()) %>% 
+      gather(key = iter, value = value, -time.id) %>% 
+      group_by(time.id) %>% 
+      summarise(
+        p05    = quantile(value, 0.05),
+        p16    = quantile(value, 0.16),
+        median = quantile(value, 0.5),
+        p84    = quantile(value, 0.84),
+        p95    = quantile(value, 0.95),
+      ) %>% 
+      left_join(df.time.id, by = "time.id") %>% 
+      mutate(varname = varnames[i]) %>% 
+      dplyr::select(varname, year, p05, p16, median, p84, p95)
+    
+    # combine with the output data frame
+    if (i == 1) {
+      # save as the output file
+      df.beta <- df.b_i
+    }else{
+      # merge with the output file
+      df.beta <- 
+        rbind(df.beta, df.b_i)
+    }
+  }
+  
+  out.list <- list(df.beta)
+  
+# ------------------------------------------------------------------------------
+# Save theta
+# ------------------------------------------------------------------------------
 
+  # obtain theta
+  df.theta <- 
+      extracted.stan$theta %>% 
+      as_tibble() 
+  
+  # save the column name
+  colnames(df.theta) <- varnames
+  
+  # save into output list
+  out.list <- append(out.list, list(df.theta))
+    
+# ------------------------------------------------------------------------------
+# Save hyper-parameters (if indicated)
+# ------------------------------------------------------------------------------
+  
+  # save the result of hyper-parameter estimation
+  # ... if NGG is indicated as the stan file
+  if (stan.file == "NGG") {
+    
+    # obtain tibbles and merge with the output data frame
+    for (current.par in hyper.pars) {
+      
+      # obtain a tibble for current hyper parameter
+      df.par_i <- 
+        extracted.stan[current.par] %>% 
+        as_tibble() 
+      
+      # merge with the output data frame
+      if (current.par == "a_xi") {
+        df.hyperparam <- df.par_i
+      } else {
+        df.hyperparam <- 
+          cbind(df.hyperparam, df.par_i)
+      }
+    }
+    
+    # save into output list
+    out.list <- append(out.list, list(df.hyperparam))
+  }
+
+# ------------------------------------------------------------------------------
+# Save the result
+# ------------------------------------------------------------------------------
+  
   # This process takes some time... 
   # save the result in the tmp folder
-  save(out.stan, file = paste("../5_tmp/", MCMC.name, sep = ""))
+  save(out.list, file = paste("../5_tmp/", stan.file, ".rda", sep = ""))
 }
