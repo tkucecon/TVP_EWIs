@@ -36,8 +36,8 @@ transformed parameters {
   }
   // hyperparameters for NGG: theta
   real<lower=0> a_xi    = 0.1;
-  real<lower=0> c_xi    = 0.1;
-  real<lower=0> kappa_b = 50;
+  real<lower=0> c_xi    = 1;
+  real<lower=0> kappa_b = 100;
   // hyperparameters for NGG: the initial value of beta
   real<lower=0> a_tau = 0.5;
   real<lower=0> c_tau = 0.5;
