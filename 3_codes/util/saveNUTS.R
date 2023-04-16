@@ -1,10 +1,10 @@
 
 # ------------------------------------------------------------------------------
 # About this code
-# run MCMC given a data frame and Stan code
+# estimate by NUTS algorithm (MCMC) given a data frame and Stan code
 # ------------------------------------------------------------------------------
 
-saveMCMC <- 
+saveNUTS <- 
   function(df,                  # data frame: explanatory variables and
            stan.file,           # name of stan file
            train       = FALSE, # indicates if this is used for training
