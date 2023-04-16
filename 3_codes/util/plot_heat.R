@@ -5,11 +5,14 @@
 # ------------------------------------------------------------------------------
 
 plot.heat <- 
-  function(MCMC.name,
-           graph.name){
+  function(MCMC.name){
+  
+  # load the output data
+  load(paste("../5_tmp/", MCMC.name, ".rda", sep = ""))  
     
-  # load the MCMC result
-  load(paste("../5_tmp/", MCMC.name, sep = ""))
+  # load beta from the MCMC result 
+  df.beta <- 
+    out.list[[1]]
   
   # clean up the global environment to avoid conflicts
   if (exists("df.plot")) {
@@ -39,7 +42,7 @@ plot.heat <-
   # save under the 6_output folder
   ggsave(plot = g.heat, 
          width = 10, height = 4, 
-         filename = paste("../6_outputs/", graph.name, sep = ""))
+         filename = paste("../6_outputs/", MCMC.name, "_heat.pdf", sep = ""))
   
   # return the heat-map
   return(g.heat)

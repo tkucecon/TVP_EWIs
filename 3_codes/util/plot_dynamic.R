@@ -5,11 +5,14 @@
 # ------------------------------------------------------------------------------
 
 plot.dynamic <- 
-  function(MCMC.name,
-           graph.name){
+  function(MCMC.name){
   
-  # load the MCMC result
-  load(paste("../5_tmp/", MCMC.name, sep = ""))
+  # load the output data
+  load(paste("../5_tmp/", MCMC.name, ".rda", sep = ""))  
+  
+  # load beta from the MCMC result 
+  df.beta <- 
+    out.list[[1]]
     
   # clean up the global environment to avoid conflicts
   if (exists("g.all")) {
@@ -96,7 +99,7 @@ plot.dynamic <-
   # save under the 6_output folder
   ggsave(plot = g.all, 
          width = 10, height = 4, 
-         filename = paste("../6_outputs/", graph.name, sep = ""))
+         filename = paste("../6_outputs/", MCMC.name, "_ts.pdf", sep = ""))
   
   # return and show the plot
   return(g.all)
