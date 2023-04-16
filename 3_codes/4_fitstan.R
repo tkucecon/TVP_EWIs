@@ -48,8 +48,8 @@
   # 3. Normal-Gamma-Gamma prior with given hyperparameter
   hyperparams <- 
     list(a_xi     = 0.1,
-         c_xi     = 0.1,
-         kappa_b  = 50,
+         c_xi     = 0.5,
+         kappa_b  = 100,
          a_tau    = 0.5,
          c_tau    = 0.5,
          lambda_b = 50
@@ -64,13 +64,17 @@
 # ------------------------------------------------------------------------------
 
   # 1. horseshoe prior
-  plot.heat(MCMC.name = "horseshoe")
-  plot.dynamic(MCMC.name = "horseshoe")
-  plot.density(MCMC.name = "horseshoe", type = 2) 
+  plot.heat("horseshoe")
+  plot.dynamic("horseshoe")
+  plot.density("horseshoe", type = 2) 
   
   # 2. NGG prior with estimated hyper-parameters
-  plot.heat(MCMC.name = "NGG")
-  plot.dynamic(MCMC.name = "NGG")
-  plot.density(MCMC.name = "NGG", type = 2) 
-  plot.density(MCMC.name = "NGG", type = 3)  
+  plot.heat("NGG")
+  plot.dynamic("NGG")
+  plot.density("NGG", type = 2) 
+  plot.density("NGG", type = 3)  
   
+  # 3. NGG prior with given hyper-parameters
+  plot.heat("NGG_manual")
+  plot.dynamic("NGG_manual")
+  plot.density("NGG_manual", type = 2) 

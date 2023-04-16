@@ -8,8 +8,12 @@ predictMCMC <-
   function(MCMC.name,
            df.test){
     
-    # load the MCMC result
-    load(paste("../5_tmp/", MCMC.name, sep = ""))
+    # load the output data
+    load(paste("../5_tmp/", MCMC.name, ".rda", sep = ""))  
+    
+    # load beta from the MCMC result 
+    df.beta <- 
+      out.list[[1]]
     
     # obtain the latest median estimates of beta
     mat.beta.last <- 

@@ -5,9 +5,10 @@
 # ------------------------------------------------------------------------------
 
 saveMCMC <- 
-  function(df,                # data frame: explanatory variables and
-           stan.file,         # name of stan file
-           hyperparams = NULL # hyper parameters: default is NULL
+  function(df,                  # data frame: explanatory variables and
+           stan.file,           # name of stan file
+           train       = FALSE, # indicates if this is used for training
+           hyperparams = NULL   # hyper parameters: default is NULL
            ){
     
 # ------------------------------------------------------------------------------
@@ -85,8 +86,8 @@ saveMCMC <-
          data       = data.stan,
          pars       = pars,
          seed       = 2292,
-         warmup     = 2000,
-         iter       = 3000)
+         warmup     = 5000,
+         iter       = 7000)
   
   # extract the MCMC result
   extracted.stan <- 
@@ -185,5 +186,9 @@ saveMCMC <-
   
   # This process takes some time... 
   # save the result in the tmp folder
-  save(out.list, file = paste("../5_tmp/", stan.file, ".rda", sep = ""))
+  if (train) {
+    save(out.list, file = paste("../5_tmp/", stan.file, "_train.rda", sep = ""))
+  } else {
+    save(out.list, file = paste("../5_tmp/", stan.file, ".rda", sep = ""))
+  }
 }
