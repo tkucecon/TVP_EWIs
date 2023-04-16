@@ -1,7 +1,7 @@
 
 # ------------------------------------------------------------------------------
 # About this code
-# Fit Stan code and conduct MCMC to estimate the main regressions
+# Fit Stan code to estimate the main regressions
 # ------------------------------------------------------------------------------
 
 # set up------------------------------------------------------------------------
@@ -15,7 +15,8 @@
   library("rstan")
   
   # some functions
-  source("util/saveMCMC.r")
+  source("util/saveNUTS.r")
+  source("util/saveADVI.r")
   source("util/plot_dynamic.r")
   source("util/plot_heat.r")
   source("util/plot_density.r")
@@ -38,13 +39,13 @@
 # ------------------------------------------------------------------------------
   
   # 1. horseshoe prior
-  saveMCMC(df        = df.normalized,
+  saveNUTS(df        = df.normalized,
            stan.file = "horseshoe")
 
   # 2. Normal-Gamma-Gamma prior with estimated hyperparameter
-  saveMCMC(df        = df.normalized,
+  saveNUTS(df        = df.normalized,
            stan.file = "NGG")
-  
+
   # 3. Normal-Gamma-Gamma prior with given hyperparameter
   hyperparams <- 
     list(a_xi     = 0.1,
@@ -55,10 +56,10 @@
          lambda_b = 50
          )
   
-  saveMCMC(df          = df.normalized,
+  saveNUTS(df          = df.normalized,
            stan.file   = "NGG_manual",
            hyperparams = hyperparams)
-  
+
 # ------------------------------------------------------------------------------
 # plot the results
 # ------------------------------------------------------------------------------

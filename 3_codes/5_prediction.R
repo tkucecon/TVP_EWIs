@@ -1,7 +1,7 @@
 
 # ------------------------------------------------------------------------------
 # About this code
-# Fit Stan code and conduct MCMC to estimate the main regressions
+# Compare the out-of-sample prediction accuracy
 # ------------------------------------------------------------------------------
 
 # set up------------------------------------------------------------------------
@@ -15,11 +15,11 @@
   library("rstan")
   
   # some functions
-  source("util/saveMCMC.r")
+  source("util/saveNUTS.r")
   source("util/plot_dynamic.r")
   source("util/plot_heat.r")
   source("util/plot_comparison.r")
-  source("util/predictMCMC.r")
+  source("util/predict_STVP.r")
 
 # set the parallel computation option-------------------------------------------
 
@@ -47,11 +47,11 @@
     filter(year >= ref.year)
   
 # ------------------------------------------------------------------------------
-# estimate MCMC using the training sample and obtain the estimates of beta
+# estimate Sparse TVP model using the training sample and obtain the estimates of beta
 # ------------------------------------------------------------------------------
   
   # gaussian transition with df.crisis.baseline.train
-  saveMCMC(df        = df.train,
+  saveNUTS(df        = df.train,
            stan.file = "horseshoe",
            train     = TRUE)
 
@@ -64,9 +64,9 @@
 # ------------------------------------------------------------------------------
   
   # obtain out-of-sample predictions with the latest estimates of beta
-  df.pred.MCMC <- 
-    predictMCMC(MCMC.name = "horseshoe_train",
-                df.test   = df.test)
+  df.pred.STVP <- 
+    predict.STVP(MCMC.name = "horseshoe_train",
+                 df.test   = df.test)
 
 # ------------------------------------------------------------------------------
 # estimate a usual logistic regression
@@ -211,7 +211,7 @@
   
   # bind the result to df.pred
   df.pred <- 
-    df.pred.MCMC %>% 
+    df.pred.STVP %>% 
     cbind(pred.logit) %>% 
     cbind(pred.lasso) %>% 
     rename(pred.lasso = s0)
@@ -220,7 +220,7 @@
   library("pROC")
   
   # calculate ROC
-  roc.MCMC  <- roc(df.pred, crisis, pred.MCMC)
+  roc.STVP  <- roc(df.pred, crisis, pred.STVP)
   roc.logit <- roc(df.pred, crisis, pred.logit)
   roc.lasso <- roc(df.pred, crisis, pred.lasso)
   
@@ -230,11 +230,11 @@
       height = 4)
   
   # plot ROC curves
-  plot(roc.MCMC)
+  plot(roc.STVP)
   plot(roc.logit, add = TRUE, lty = 2, col = "blue")
   plot(roc.lasso, add = TRUE, lty = 3, col = "red")
   legend("bottomright", 
-         c(paste("Bayesian (", round(auc(roc.MCMC), 2), ")", sep = ""),
+         c(paste("Bayesian (", round(auc(roc.STVP), 2), ")", sep = ""),
            paste("Logit (", round(auc(roc.logit), 2), ")" , sep = ""), 
            paste("LASSO (", round(auc(roc.lasso), 2), ")" , sep = "")),
          lty = c(1, 2, 3),
@@ -256,9 +256,9 @@
 #     mutate(crisis = as.factor(crisis))
 #   
 #   # check the precision
-#   df.pr.auc.MCMC <- 
+#   df.pr.auc.STVP <- 
 #     df.pred.pr %>% 
-#     yardstick::pr_auc(truth = crisis, pred.MCMC) %>% 
+#     yardstick::pr_auc(truth = crisis, pred.STVP) %>% 
 #     mutate(method = "Bayesian")
 #   
 #   df.pr.auc.logit <- 
@@ -273,11 +273,11 @@
 #   
 #   # combine all
 #   df.pr.auc <- 
-#     rbind(df.pr.auc.MCMC, df.pr.auc.logit, df.pr.auc.lasso)
+#     rbind(df.pr.auc.STVP, df.pr.auc.logit, df.pr.auc.lasso)
 #   
 #   # plot the ROC curves
 #   df.pred.pr %>% 
-#     yardstick::roc_curve(crisis, pred.MCMC) %>% 
+#     yardstick::roc_curve(crisis, pred.STVP) %>% 
 #     autoplot()
 #   df.pred.pr %>% 
 #     yardstick::roc_curve(crisis, pred.logit) %>% 
@@ -287,9 +287,9 @@
 #     autoplot()
 #   
 #   # plot the PR curves
-#   pr.MCMC <- 
+#   pr.STVP <- 
 #     df.pred.pr %>% 
-#     yardstick::pr_curve(crisis, pred.MCMC) %>% 
+#     yardstick::pr_curve(crisis, pred.STVP) %>% 
 #     autoplot()
 #   
 #   pr.logit <- 
@@ -324,7 +324,7 @@
 #   # MCMC
 #   df.pred %>% 
 #     mutate(crisis = as.factor(crisis)) %>% 
-#     mutate(pred = if_else(pred.MCMC > 0.5, 1, 0)) %>% 
+#     mutate(pred = if_else(pred.STVP > 0.5, 1, 0)) %>% 
 #     mutate(pred = as.factor(pred)) %>% 
 #     yardstick::conf_mat(truth    = crisis,
 #                         estimate = pred)
