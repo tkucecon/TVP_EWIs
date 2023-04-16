@@ -17,8 +17,8 @@ data {
 // parameters accepted by the model
 parameters {
   // main
-  matrix[p, Tmax] beta;     // matrix of coefficients including intercept
-  vector<lower=0>[p] theta; // vector of sd of coefficients (controls smoothness)
+  matrix[p, Tmax]             beta;  // matrix of coefficients including intercept
+  vector<lower=0, upper=5>[p] theta; // vector of sd of coefficients
   // latent parameters for horseshoe prior: for theta
   vector<lower=0>[p] lambda_theta;
   real<lower=0> tau_theta;

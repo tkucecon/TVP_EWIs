@@ -18,11 +18,12 @@
   source("util/saveMCMC.r")
   source("util/plot_dynamic.r")
   source("util/plot_heat.r")
+  source("util/plot_density.r")
   
 # set the parallel computation option-------------------------------------------
   
   # set options
-  # rstan_options(auto_write = TRUE)
+  rstan_options(auto_write = TRUE)
   options(mc.cores = parallel::detectCores()) 
   
 # ------------------------------------------------------------------------------
@@ -48,23 +49,28 @@
   hyperparams <- 
     list(a_xi     = 0.1,
          c_xi     = 0.1,
-         kappa_b  = 100,
+         kappa_b  = 50,
          a_tau    = 0.5,
          c_tau    = 0.5,
-         lambda_b = 10
+         lambda_b = 50
          )
   
   saveMCMC(df          = df.normalized,
-           stan.file   = "NGG_manual.stan",
+           stan.file   = "NGG_manual",
            hyperparams = hyperparams)
   
 # ------------------------------------------------------------------------------
 # plot the results
 # ------------------------------------------------------------------------------
 
-  # 1. gaussian transition with df.crisis.baseline
-  plot.heat(MCMC.name  = "horseshoe.rda",
-            graph.name = "horseshoe_heat.pdf")
+  # 1. horseshoe prior
+  plot.heat(MCMC.name = "horseshoe")
+  plot.dynamic(MCMC.name = "horseshoe")
+  plot.density(MCMC.name = "horseshoe", type = 2) 
   
-  plot.dynamic(MCMC.name  = "horseshoe.rda",
-               graph.name = "horseshoe_ts.pdf")
+  # 2. NGG prior with estimated hyper-parameters
+  plot.heat(MCMC.name = "NGG")
+  plot.dynamic(MCMC.name = "NGG")
+  plot.density(MCMC.name = "NGG", type = 2) 
+  plot.density(MCMC.name = "NGG", type = 3)  
+  
