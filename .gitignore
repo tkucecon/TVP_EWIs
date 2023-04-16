@@ -40,7 +40,8 @@ vignettes/*.pdf
 
 # ignore the following folders
 3_codes/×/
+3_codes/stan/×/
+3_codes/stan/*.rds
 3_codes/util/×/
-5_tmp/
 4_data/input/
-
+5_tmp/
