@@ -4,7 +4,7 @@
 # Obtain out-of-sample predictions using the estimated stan file
 # ------------------------------------------------------------------------------
 
-predictMCMC <- 
+predict.STVP <- 
   function(MCMC.name,
            df.test){
     
@@ -44,9 +44,9 @@ predictMCMC <-
     # combine with the true crisis data and save as a data frame
     df.pred <- 
       data.frame(crisis    = as.numeric(mat.Y), 
-                 pred.MCMC = mat.prob) %>% 
+                 pred.STVP = mat.prob) %>% 
       as_tibble() %>% 
-      rename(pred.MCMC = median)
+      rename(pred.STVP = median)
 
     # return 
     return(df.pred)
