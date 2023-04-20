@@ -5,16 +5,24 @@
 # ------------------------------------------------------------------------------
 
 saveNUTS <- 
-  function(df,                  # data frame: explanatory variables and
-           stan.file,           # name of stan file
-           train       = FALSE, # indicates if this is used for training
-           hyperparams = NULL   # hyper parameters: default is NULL
+  function(df,                   # data frame
+           stan.file,            # name of stan file
+           target,               # target crisis variable
+           total.credit = TRUE,  # use total credit instead of household/business credit
+           train        = FALSE, # indicates if this is used for training
+           hyperparams  = NULL,  # hyper parameters: default is NULL
+           p0           = NULL   # p0 if indicated
            ){
     
 # ------------------------------------------------------------------------------
 # Prepare the data set
 # ------------------------------------------------------------------------------
   
+  # process the input data set with regdf
+  df <- regdf(df           = df,
+              target       = target,
+              total.credit = total.credit)
+    
   # create the country ID according to countries
   df <- 
     df %>% 
@@ -42,7 +50,6 @@ saveNUTS <-
   Y <- 
     df %>% 
     select(crisis) %>% 
-    mutate(crisis = as.numeric(crisis) - 1) %>% 
     unlist() %>% 
     as.numeric()
 
@@ -63,9 +70,12 @@ saveNUTS <-
          Tid      = Tid
     )
   
-  # if hyper-parameter is given, merge with the input data
-  data.stan <- 
-    c(data.stan, hyperparams)
+  # if p0 is given as number, save the global scale parameter
+  if (is.numeric(p0)) {
+    scale_global <- p0 / (p - p0)
+    data.stan <- 
+      c(data.stan, list(scale_global = scale_global))
+  }
   
   # indicate output pars
   pars <- c("beta", "theta")
@@ -184,11 +194,17 @@ saveNUTS <-
 # Save the result
 # ------------------------------------------------------------------------------
   
+  # save the file name
+  file.name <- paste("../5_tmp/", stan.file, "_", target, sep = "")
+  
+  if (!total.credit) {
+    file.name <- paste(file.name, "_alt", sep = "")
+  }
+  if (is.numeric(train)) {
+    file.name <- paste(file.name, "_", train, sep = "")
+  }
+  
   # This process takes some time... 
   # save the result in the tmp folder
-  if (train) {
-    save(out.list, file = paste("../5_tmp/", stan.file, "_train.rda", sep = ""))
-  } else {
-    save(out.list, file = paste("../5_tmp/", stan.file, ".rda", sep = ""))
-  }
+  save(out.list, file = paste(file.name, ".rda", sep = ""))
 }
