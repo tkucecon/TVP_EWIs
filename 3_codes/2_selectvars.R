@@ -12,7 +12,6 @@
   theme_set(theme_solarized())
   library("patchwork")
   
-  library("tidymodels")
   library("corrplot")
   
 # ------------------------------------------------------------------------------
@@ -26,7 +25,7 @@
 # Check the number of missing values
 # ------------------------------------------------------------------------------
 
-  # number of missing values
+  # check the number of missing values at this point
   df.master %>% 
     skimr::skim()
   
@@ -42,13 +41,11 @@
   
   # Finding:
   # global variables should be excluded basically (except for yield curve slope)
-  # strong correlation between noncore and loan-to-value
-  # slight correlation between leverage and ltd
-  # slight correlation between leverage and ltd
-  
+
   # diff variables
   df.master %>% 
     select(starts_with("diff")) %>% 
+    select(ends_with("dom")) %>% 
     cor(use = "pairwise.complete.obs") %>% 
     corrplot(addCoef.col = "black")
   
@@ -58,9 +55,9 @@
   # mortgage and thh should be excluded
   # strong correlation between domestic and global dsr
   # strong correlation between global money and global iy
-  # slight correlation between current account and iy
   # slight correlation between credit and dsr
   # slight correlation between credit and money
+  # slight correlation between credit to household and business
   
   # growth variables
   df.master %>% 
@@ -83,91 +80,72 @@
     df.master %>% 
     select(
       # necessary variables
-      year, country, crisis,
+      year, country, JST, joint, BVX,
       # level variables
       level.lev.dom,
-      level.ltd.dom,
+      level.noncore.dom,
       level.slope.dom,
       level.slope.glo,
+      level.xrusd.dom,
       # difference variables
-      diff.ca.dom,
       diff.credit.dom,
       diff.credit.glo,
+      diff.credit.hh.dom,
+      diff.credit.bus.dom,
+      diff.ca.dom,
       diff.dsr.dom,
+      diff.pdebt.dom,
       diff.iy.dom,
+      diff.xrusd.dom,
       diff.lev.dom,
-      diff.money.dom,
-      diff.money.glo,
       diff.noncore.dom,
-      diff.noncore.glo,
       # growth variables
       growth.cpi.dom,
       growth.equity.dom,
-      growth.hpreal.dom,
       growth.rcon.dom,
-    ) 
-  
-  # check the correlation
-  df.core %>% 
-    select(-year, -country, -crisis) %>% 
-    cor(use = "pairwise.complete.obs") %>% 
-    corrplot(addCoef.col = "black")
-  
+      growth.hpreal.dom
+    ) %>% 
+    rename(
+      # level variables
+      `Capital Asset Ratio`    = level.lev.dom,
+      `Noncore Funding Ratio`  = level.noncore.dom,
+      `Slope of Yield Curves`  = level.slope.dom,
+      `Slope of Yield Curves*` = level.slope.glo,
+      `Exchange Rates`         = level.xrusd.dom,
+      # difference variables
+      `Credit to GDP Change`           = diff.credit.dom,
+      `Credit to GDP Change*`          = diff.credit.glo,
+      `Household Credit to GDP Change` = diff.credit.hh.dom,
+      `Business Credit to GDP Change`  = diff.credit.bus.dom,
+      `Current Account Change`         = diff.ca.dom,
+      `Debt Service Ratio Change`      = diff.dsr.dom,
+      `Public Debt Change`             = diff.pdebt.dom,
+      `Investment to GDP Change`       = diff.iy.dom,
+      `Exchange Rates Change`          = diff.xrusd.dom,
+      `Capital Asset Ratio Change`     = diff.lev.dom,
+      `Noncore Funding Ratio Change`   = diff.noncore.dom,
+      # growth variables
+      `Inflation Rate`          = growth.cpi.dom,
+      `Equity Growth`           = growth.equity.dom,
+      `Consumption Growth`      = growth.rcon.dom,
+      `Real Houseprice Growth`  = growth.hpreal.dom,
+    )
+    
   # save the core data for later use
-  # save the data
   save(df.core, file = "../4_data/df_core.rda")
   
-# ------------------------------------------------------------------------------
-# Normalize the data: this will be useful to compare the coefficients
-# ------------------------------------------------------------------------------
-  
-  # create a recipe to scale the variables
-  recipe.normalize <- 
-    recipe(x = df.core, formula = as.formula(crisis ~ .)) %>% 
-    # remove some variables from the predictors %>% 
-    update_role(year,             new_role = "time variable") %>% 
-    update_role(country,          new_role = "id variable") %>% 
-    # normalize all the predictors to be distributed ~ N(0,1) 
-    step_normalize(all_predictors(), skip = FALSE) %>% 
-    # delete rows with no variance
-    step_zv(all_predictors(), skip = FALSE) 
-  
-  # create an empty data frame to stack the data
-  df.normalized <- 
+  # Correlation matrix can be seen as follows
+  cor.mat <- 
     df.core %>% 
-    filter(country == "hogehoge")
+    select(-year, -country, -JST, -joint, -BVX) %>% 
+    cor(use = "pairwise.complete.obs") 
   
-  # save the countries
-  countries.JST <- 
-    df.core %>% 
-    select(country) %>% 
-    unique() %>% 
-    unlist()
+  # check the test
+  cor.p <- 
+    cor.mtest(cor.mat)
   
-  # apply the recipe to all countries: loop used because group_by is not allowed for recipes
-  for (target.country in countries.JST) {
-    # create normalized data frame for a specific country
-    df.core.ctry <- 
-      df.core %>% 
-      # keep only one specific country
-      filter(country == target.country)
-    
-    # create a data frame with normalized variables
-    df.normalized.tmp <- 
-      recipe.normalize %>% 
-      prep() %>% 
-      bake(new_data = df.core.ctry)
-    
-    # stack the data into the global data frame
-    df.normalized <- 
-      bind_rows(df.normalized, df.normalized.tmp)  
-  }
+  # check the matrix
+  cor.mat %>% 
+    corrplot(addCoef.col = "black",  p.mat = cor.p$p, sig.level = 0.01)
   
-  # remove NA rows
-  df.normalized <- 
-    df.normalized %>% 
-    na.omit()
-  
-  # save the data
-  save(df.normalized, file = "../4_data/df_normalized.rda")
   

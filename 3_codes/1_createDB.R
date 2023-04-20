@@ -1,13 +1,22 @@
 
 # ------------------------------------------------------------------------------
 # About this code
-# ...creates the master data for advanced economies included in the JST data set
+# ...creates the master data for 18 advanced economies covering 1870-2017
 
-# The procedure is as follows:
-# 1. download the JST data 
-# 2. process the JST data (level to diff/growth/gap transformation)
-#    ... for the growth predictors, winsorize and remove the effects of outliers
-# 3. download the Baron et al.(2020) data and merge only equity returns
+# crisis data part: merge crisis series from the following three data
+  # 1. Jorda Schularick and Taylor (2017): JST dataset hereafter
+  # 2. Harvard Crisis Database: based on Reinhart and Rogoff (2008) so RR dataset hereafter
+  # 3. Baron, Verner and Xiong (2021): BVX dataset hereafter
+  # .. 1 and 2 define crises based on narratives.
+  # .. 3 on the other hand uses a systematic indicator as the crisis: 30% or more decline in bank equity prices
+
+# explanatory variable part: all data based on JST dataset
+  # 1. keep only relevant variables as the level data
+  # 2. transform and define some variables as difference/growth ones
+  # ... for the growth predictors, winsorize and remove the effects of outliers
+
+# merge crisis and explanatory datasets
+# we obtain a data frame "df.master" 
 # ------------------------------------------------------------------------------
 
 # set up------------------------------------------------------------------------
@@ -15,34 +24,82 @@
 # library
   library("tidyverse")
   library("lubridate")
-  library("haven")
   library("ggthemes")
   theme_set(theme_solarized())
   
-  library("skimr")
-  library("mFilter")
+  library("haven")
+  library("readxl")
   library("tidymodels")
   library("DescTools")
-
+  
 # ------------------------------------------------------------------------------
-# Download the JST data
+# Crisis Data Part
 # ------------------------------------------------------------------------------
   
   # download the JST data
   df.JST.original <- 
     read_dta("http://data.macrohistory.net/JST/JSTdatasetR5.dta")
   
-  # check the entire sample size and compare with the original paper
-  df.JST.original %>% 
-    select(year, country, crisisJST) %>% 
-    skim()
+  # keep only the crisis variables in the JST data
+  df.JST.crisis <- 
+    df.JST.original %>% 
+    select(year, country, iso, crisisJST) %>% 
+    rename(crisis.JST = crisisJST)
+  
+  # load the RR (Harvard) data
+  # .xlsx data saved under 4_data/input folder
+  df.RR.original <- 
+    read_excel("../4_data/input/Harvard.xlsx")
+  
+  # extract only banking crisis information
+  df.RR.crisis <- 
+    df.RR.original %>% 
+    rename(year       = Year,
+           country    = Country,
+           iso        = CC3,
+           crisis.RR  = `Banking Crisis`,
+           dummy.gold = `Gold Standard`) %>% 
+    select(year, iso, crisis.RR, dummy.gold) %>% 
+    na.omit() %>% 
+    # df.RR.crisis now recognizes crisis as character because of some "n/a" cells
+    # change into numeric value
+    mutate(crisis.RR  = as.numeric(crisis.RR),
+           dummy.gold = as.numeric(dummy.gold))
+  
+  # load the BVX data
+  # .dta data saved under 4_data/input folder
+  df.BVX.original <- 
+    read_dta("../4_data/input/BVX.dta")
 
-  # it seems to be updated from the BOE paper
-  # ... 18 developed countries are included: recent data about Ireland is now included
-  # ... 2017 data is now available
+  # keep only relevant values to merge
+  df.BVX.crisis <- 
+    df.BVX.original %>% 
+    select(year, ISO3, Rtot_real_w, C_B30) %>% 
+    rename(iso        = ISO3,
+           bank.eq    = Rtot_real_w,
+           crisis.BVX = C_B30)
+  
+  # merge the three crisis data frame
+  df.crisis <- 
+    df.JST.crisis %>% 
+    left_join(df.RR.crisis,  by = c("iso", "year")) %>% 
+    left_join(df.BVX.crisis, by = c("iso", "year")) %>% 
+    # define narrative joint crisis variable as "crisis.joint"
+    # ... if either JST or RR definition shows crisis, then indicate as 1
+    mutate(crisis.joint = pmap(select(., crisis.JST, crisis.RR), ~pmax(..., na.rm = TRUE))) %>% 
+    # keep only relevant variables
+    select(year, country, crisis.JST, crisis.joint, crisis.BVX, bank.eq) %>% 
+    rename(JST   = crisis.JST,
+           joint = crisis.joint,
+           BVX   = crisis.BVX)
+
+  # remove unnecessary data frames from the global environment
+  rm(df.BVX.crisis, df.BVX.original, 
+     df.RR.crisis,  df.RR.original, 
+     df.JST.crisis)
   
 # ------------------------------------------------------------------------------
-# Preprocess the JST data
+# Explanatory Variable Part
 # ------------------------------------------------------------------------------
   
   # define some level variables and leave only relevant ones
@@ -50,56 +107,53 @@
     df.JST.original %>% 
     # group by the country
     group_by(country) %>% 
-    # define the outcome variable: 1 and 2 year before the crisis is the target
-    mutate(
-      crisis.f1 = lead(crisisJST, n = 1),
-      crisis.f2 = lead(crisisJST, n = 2)) %>%
-    mutate(crisis = if_else(
-      crisis.f1 == 1 | crisis.f2 == 1, 1, 0
-    )) %>% 
-    # factorize the outcome variable: not numeric
-    mutate(crisis = as.factor(crisis)) %>% 
     # define some features
     mutate(
       level.slope       = ltrate - stir,         # slope of the yield curve
       level.credit      = tloans / gdp,          # credit to GDP ratio
+      level.credit.hh   = thh / gdp,             # household credit to GDP ratio
+      level.credit.bus  = tbus / gdp,            # business credit to GDP ratio
       level.money       = money / gdp,           # money to GDP ratio
       level.ca          = ca / gdp,              # current account to GDP ratio
       level.dsr         = tloans * ltrate / gdp, # debt service ratio
       level.hpreal      = hpnom / cpi * 100,     # real house price
-      level.tmort       = tmort / gdp,           # mortgage loan to GDP ratio
-      level.thh         = thh / gdp,             # household credit to GDP ratio
       level.gdpreal     = gdp / cpi * 100        # real GDP
-             ) %>% 
+      ) %>% 
     # rename some variables to explicitly show that they are level variables
     rename(
-      level.stir        = stir,                  # short-term interest rates
-      level.rcon        = rconpc,                # real consumption per capita
-      level.iy          = iy,                    # investment to GDP ratio
-      level.cpi         = cpi,                   # consumer price
-      level.pdebt       = debtgdp,               # public debt to GDP ratio
-      level.lev         = lev,                   # leverage of banks
-      level.ltd         = ltd,                   # loan to deposit ratio
-      level.noncore     = noncore                # noncore funding ratio
-    ) %>% 
+      level.stir        = stir,    # short-term interest rates
+      level.rcon        = rconpc,  # real consumption per capita
+      level.iy          = iy,      # investment to GDP ratio
+      level.cpi         = cpi,     # consumer price
+      level.pdebt       = debtgdp, # public debt to GDP ratio
+      level.lev         = lev,     # capital-to-asset ratio of banks
+      level.ltd         = ltd,     # loan to deposit ratio
+      level.noncore     = noncore, # noncore funding ratio
+      level.xrusd       = xrusd,   # exchange rates against US dollars
+      dummy.peg         = peg      # exchange rate peg dummy
+      ) %>% 
     # keep only relevant variables for simplicity
-    select(year, country, iso, crisis, crisisJST, starts_with("level"), eq_tr)
+    select(year, country, starts_with("level"), starts_with("dummy"), eq_tr)
   
   # Define some variables as 2-year difference of GDP-ratio * 100
   df.JST.difference <- 
     df.JST.level %>% 
+    # group by the country
+    group_by(country) %>% 
+    # define some variables as 2-year difference of GDP-ratio * 100
     mutate(
-      diff.credit   = (level.credit  - lag(level.credit,  n = 2)) * 100, # credit
-      diff.dsr      = (level.dsr     - lag(level.dsr,     n = 2)) * 100, # debt service ratio
-      diff.iy       = (level.iy      - lag(level.iy,      n = 2)) * 100, # investment
-      diff.pdebt    = (level.pdebt   - lag(level.pdebt,   n = 2)) * 100, # public debt
-      diff.money    = (level.money   - lag(level.money,   n = 2)) * 100, # money
-      diff.ca       = (level.ca      - lag(level.ca,      n = 2)) * 100, # current account
-      diff.mortgage = (level.tmort   - lag(level.tmort,   n = 2)) * 100, # mortgage loan
-      diff.thh      = (level.thh     - lag(level.thh,     n = 2)) * 100, # household credit
-      diff.lev      = (level.lev     - lag(level.lev,     n = 2)) * 100, # household credit
-      diff.ltd      = (level.ltd     - lag(level.ltd,     n = 2)) * 100, # household credit
-      diff.noncore  = (level.noncore - lag(level.noncore, n = 2)) * 100  # household credit
+      diff.credit     = (level.credit     - lag(level.credit,     n = 2)) * 100, # total credit
+      diff.credit.hh  = (level.credit.hh  - lag(level.credit.hh,  n = 2)) * 100, # household credit
+      diff.credit.bus = (level.credit.bus - lag(level.credit.bus, n = 2)) * 100, # business credit
+      diff.dsr        = (level.dsr        - lag(level.dsr,        n = 2)) * 100, # debt service ratio
+      diff.iy         = (level.iy         - lag(level.iy,         n = 2)) * 100, # investment
+      diff.pdebt      = (level.pdebt      - lag(level.pdebt,      n = 2)) * 100, # public debt
+      diff.money      = (level.money      - lag(level.money,      n = 2)) * 100, # money
+      diff.ca         = (level.ca         - lag(level.ca,         n = 2)) * 100, # current account
+      diff.lev        = (level.lev        - lag(level.lev,        n = 2))      , # bank capital to asset ratio
+      diff.ltd        = (level.ltd        - lag(level.ltd,        n = 2))      , # bank loan to deposit ratio
+      diff.noncore    = (level.noncore    - lag(level.noncore,    n = 2))      , # bank noncore funding ratio
+      diff.xrusd      = (level.xrusd      - lag(level.xrusd,      n = 2))        # exchange rates against US dollars
     ) %>% 
     # keep only difference variables and key indicators to merge
     select(year, country, starts_with("diff"))
@@ -107,6 +161,8 @@
   # Define some variables as 2-year growth rates
   df.JST.growth <- 
     df.JST.level %>% 
+    # group by the country
+    group_by(country) %>% 
     # define some variables as 2-year growth rate of index
     mutate(
       growth.cpi    = level.cpi    / lag(level.cpi,    n = 2) * 100 - 100, # growth rate of the CPI
@@ -124,63 +180,19 @@
            ) %>% 
     select(year, country, starts_with("growth"))
   
-  # Define some variables as the gap from HP filtered series
-  df.JST.gap <- 
-    df.JST.level %>% 
-    select(year, country, starts_with("level")) %>% 
-    ungroup() %>% 
-    gather(key = "key", value = "value", starts_with("level")) %>% 
-    group_by(country, key) %>% 
-    drop_na() %>% 
-    mutate(cycle = hpfilter(value, type = "lambda", freq = 6.25)$cycle) %>% 
-    select(-value) %>% 
-    ungroup() %>% 
-    spread(key = "key", value = "cycle") %>% 
-    arrange(country, year) %>% 
-    rename(
-      gap.credit  = level.credit,
-      gap.gdpreal = level.gdpreal,
-      gap.thh     = level.thh,
-      gap.tmort   = level.tmort,
-      gap.lev     = level.lev,
-      gap.ltd     = level.ltd,
-      gap.dsr     = level.dsr,
-      gap.ca      = level.ca,
-      gap.noncore = level.noncore
-    ) %>% 
-    select(year, country, starts_with("gap"))
-  
   # merge all the data as the domestic data set
   df.JST.domestic <- 
     # merge all the data
     df.JST.level %>% 
     # keep only necessary level data (drop if before transformation)
-    select(year, country, iso, crisis, crisisJST, level.stir, level.lev, level.ltd, level.noncore, level.slope) %>% 
+    select(year, country, level.stir, level.slope, level.lev, level.noncore, level.ltd, level.xrusd, dummy.peg) %>% 
     # merge transformed data
     left_join(df.JST.difference, by = c("country", "year")) %>% 
     left_join(df.JST.growth,     by = c("country", "year")) %>% 
-    left_join(df.JST.gap,        by = c("country", "year")) %>% 
-    # create a dummy to exclude the crisis year and four subsequent years
-    mutate(crisis.ex = if_else(
-        crisisJST == 1 | 
-        lag(crisisJST, n = 1) == 1 | 
-        lag(crisisJST, n = 2) == 1 | 
-        lag(crisisJST, n = 3) == 1 | 
-        lag(crisisJST, n = 4) == 1,
-      1, 0
-    )) %>% 
-    # exclude the crisis year and the four subsequent years
-    filter(crisis.ex == 0) %>% 
-    # exclude some unusual periods
-    filter(!(year >= 1914 & year <= 1918)) %>% # exclude the WW1 period
-    filter(!(year >= 1933 & year <= 1939)) %>% # exclude the great depression period
-    filter(!(year >= 1939 & year <= 1945)) %>% # exclude the WW2 period
     # reset the grouping
     ungroup() %>% 
-    # keep only the relevant variables
-    select(-crisisJST, -crisis.ex) %>% 
     # rename the variables to explicitly indicate that they are domestic variables
-    gather(key = "key", value = "value", -year, -country, -iso, -crisis) %>% 
+    gather(key = "key", value = "value", -year, -country) %>% 
     mutate(key = paste(key, ".dom", sep = "")) %>% 
     spread(key = "key", value = "value") %>% 
     arrange(country, year)
@@ -206,7 +218,6 @@
     df.JST.domestic %>% 
     rename_with(\(x) str_replace(x, ".dom", ".glo"),
                 ends_with(".dom")) %>% 
-    select(-crisis, -iso) %>% 
     filter(country == "hogehoge")
   
   # repeat the process for all the countries
@@ -233,45 +244,19 @@
   }
   
   # merge the domestic and global data into a single master data frame
-  df.JST <- 
+  df.exp <- 
     df.JST.domestic %>% 
     # keep only the samples available in the domestic data frame: left join
     left_join(df.JST.global, by = c("year", "country"))
   
-  # drop if the crisis is NA
-  df.JST <- 
-    df.JST %>% 
-    filter(!is.na(crisis))
-  
-  # done! this procedure leaves us 1814 observations
-
-# ------------------------------------------------------------------------------
-# Prepare the equity value data from Baron et al. (2020): BVX hereafter
-# ------------------------------------------------------------------------------
-  
-  # load the .dta data saved under 4_data/input folder
-  df.BVX.original <- 
-    read_dta("../4_data/input/BVX_annual_regdata.dta")
-  
-  # keep only relevant values to merge
-  df.BVX <- 
-    df.BVX.original %>% 
-    select(year, ISO3, Rtot_real, Rtot_real_w) %>% 
-    rename(iso     = ISO3,
-           bank.eq = Rtot_real_w) %>% 
-    group_by(iso) %>% 
-    mutate(bank.eq.f1 = lead(bank.eq, n = 1),
-           bank.eq.f2 = lead(bank.eq, n = 2)) %>% 
-    ungroup()
-  
-  # merge with df.JST
-  df.master <- 
-    df.JST %>% 
-    left_join(df.BVX, by = c("iso", "year"))
-  
 # ------------------------------------------------------------------------------
 # save the data
 # ------------------------------------------------------------------------------
+  
+  # merge the crisis data and explanatory data 
+  df.master <- 
+    df.crisis %>% 
+    left_join(df.exp, by = c("year", "country"))
   
   # save the data
   save(df.master, file = "../4_data/df_master.rda")
