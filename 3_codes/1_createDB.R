@@ -53,7 +53,7 @@
     select(year, ISO3, JC, C_B30) %>% 
     rename(iso          = ISO3,
            crisis.joint = JC,
-           crisis.BVX   = C_B30)
+           crisis.BVX   = C_B30) 
   
   # merge the three crisis data frame
   df.crisis <- 
@@ -62,6 +62,7 @@
     # define narrative joint crisis variable as "crisis.joint"
     # ... if either JST or RR definition shows crisis, then indicate as 1 (just to deal with update of JST data)
     mutate(crisis.joint = pmap(select(., crisis.JST, crisis.joint), ~pmax(..., na.rm = TRUE))) %>% 
+    mutate(crisis.joint = as.numeric(crisis.joint)) %>% 
     # keep only relevant variables
     select(year, country, crisis.JST, crisis.joint, crisis.BVX) %>% 
     rename(JST   = crisis.JST,

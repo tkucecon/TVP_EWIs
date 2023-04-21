@@ -65,7 +65,19 @@
            target    = "JST",
            train     = ref.year,
            stan.file = "reghorse",
+           p0        = 1)
+  
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "reghorse",
            p0        = 2)
+  
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "reghorse",
+           p0        = 3)
   
   saveNUTS(df        = df.train,
            target    = "JST",
@@ -73,25 +85,15 @@
            stan.file = "reghorse",
            p0        = 4)
   
-  saveNUTS(df        = df.train,
-           target    = "JST",
-           train     = ref.year,
-           stan.file = "reghorse",
-           p0        = 6)
-  
-  saveNUTS(df        = df.train,
-           target    = "JST",
-           train     = ref.year,
-           stan.file = "reghorse",
-           p0        = 8)
-  
 # ------------------------------------------------------------------------------
 # obtain out of sample prediction for MCMC
 # ------------------------------------------------------------------------------
   
   # obtain out-of-sample predictions with the latest estimates of beta
-  df.pred.STVP <- 
-    predict.STVP(MCMC.name = "reg_horseshoe_train",
+  df.pred. <- 
+    predict.STVP(file.path = "train1990",
+                 file.name = "horseshoe_JST_tot",
+                 target    = "JST",
                  df.test   = df.test)
   
 # ------------------------------------------------------------------------------

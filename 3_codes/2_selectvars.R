@@ -25,52 +25,52 @@
 # Check the number of missing values
 # ------------------------------------------------------------------------------
 
-  # check the number of missing values at this point
-  df.master %>% 
-    skimr::skim()
+  # # check the number of missing values at this point
+  # df.master %>% 
+  #   skimr::skim()
   
 # ------------------------------------------------------------------------------
 # Check the correlation matrix
 # ------------------------------------------------------------------------------
   
-  # level variables
-  df.master %>% 
-    select(starts_with("level")) %>% 
-    cor(use = "pairwise.complete.obs") %>% 
-    corrplot(addCoef.col = "black")
-  
-  # Finding:
-  # global variables should be excluded basically (except for yield curve slope)
-
-  # diff variables
-  df.master %>% 
-    select(starts_with("diff")) %>% 
-    select(ends_with("dom")) %>% 
-    cor(use = "pairwise.complete.obs") %>% 
-    corrplot(addCoef.col = "black")
-  
-  # Finding:
-  # ltd should be excluded
-  # pdebt should be excluded
-  # mortgage and thh should be excluded
-  # strong correlation between domestic and global dsr
-  # strong correlation between global money and global iy
-  # slight correlation between credit and dsr
-  # slight correlation between credit and money
-  # slight correlation between credit to household and business
-  
-  # growth variables
-  df.master %>% 
-    select(starts_with("growth")) %>% 
-    select(-growth.cpi.glo, -growth.equity.glo, -growth.rcon.glo) %>% 
-    cor(use = "pairwise.complete.obs") %>% 
-    corrplot(addCoef.col = "black")
-  
-  # Finding:
-  # strong correlation between domestic and global cpi
-  # strong correlation between domestic and global equity
-  # strong correlation between domestic and global consumption
-  # slight correlation between hpreal and consumption
+  # # level variables
+  # df.master %>% 
+  #   select(starts_with("level")) %>% 
+  #   cor(use = "pairwise.complete.obs") %>% 
+  #   corrplot(addCoef.col = "black")
+  # 
+  # # Finding:
+  # # global variables should be excluded basically (except for yield curve slope)
+  # 
+  # # diff variables
+  # df.master %>% 
+  #   select(starts_with("diff")) %>% 
+  #   select(ends_with("dom")) %>% 
+  #   cor(use = "pairwise.complete.obs") %>% 
+  #   corrplot(addCoef.col = "black")
+  # 
+  # # Finding:
+  # # ltd should be excluded
+  # # pdebt should be excluded
+  # # mortgage and thh should be excluded
+  # # strong correlation between domestic and global dsr
+  # # strong correlation between global money and global iy
+  # # slight correlation between credit and dsr
+  # # slight correlation between credit and money
+  # # slight correlation between credit to household and business
+  # 
+  # # growth variables
+  # df.master %>% 
+  #   select(starts_with("growth")) %>% 
+  #   select(-growth.cpi.glo, -growth.equity.glo, -growth.rcon.glo) %>% 
+  #   cor(use = "pairwise.complete.obs") %>% 
+  #   corrplot(addCoef.col = "black")
+  # 
+  # # Finding:
+  # # strong correlation between domestic and global cpi
+  # # strong correlation between domestic and global equity
+  # # strong correlation between domestic and global consumption
+  # # slight correlation between hpreal and consumption
   
 # ------------------------------------------------------------------------------
 # Define core data and save for later analysis
@@ -82,8 +82,7 @@
       # necessary variables
       year, country, JST, joint, BVX,
       # level variables
-      level.lev.dom,
-      level.noncore.dom,
+      # level.lev.dom,
       level.slope.dom,
       level.slope.glo,
       level.xrusd.dom,
@@ -106,8 +105,7 @@
     ) %>% 
     rename(
       # level variables
-      `Capital Asset Ratio`    = level.lev.dom,
-      `Noncore Funding Ratio`  = level.noncore.dom,
+      # `Capital Asset Ratio`    = level.lev.dom,
       `Slope of Yield Curves`  = level.slope.dom,
       `Slope of Yield Curves*` = level.slope.glo,
       `Exchange Rates`         = level.xrusd.dom,

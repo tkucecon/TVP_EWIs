@@ -5,11 +5,17 @@
 # ------------------------------------------------------------------------------
 
 predict.STVP <- 
-  function(MCMC.name,
+  function(file.path, 
+           file.name,
+           target,
+           total.credit = TRUE,
            df.test){
     
+    # process the data frame
+    df.test <- regdf(df.test, target, total.credit = total.credit)
+    
     # load the output data
-    load(paste("../5_tmp/", MCMC.name, ".rda", sep = ""))  
+    load(paste("../5_tmp/", file.path, "/", file.name, ".rda", sep = ""))  
     
     # load beta from the MCMC result 
     df.beta <- 
@@ -27,13 +33,14 @@ predict.STVP <-
     # save the latest beta
     mat.beta.last <- as.matrix(df.beta.last$median)
     
-    # obtain Y and X as matrix
+    # obtain X as matrix
     mat.X <- 
       df.test %>% 
       mutate(intercept = 1) %>% 
       select(all_of(varnames)) %>% 
       as.matrix()
     
+    # obtain Y
     mat.Y <-
       df.test %>% 
       select(crisis) %>% 

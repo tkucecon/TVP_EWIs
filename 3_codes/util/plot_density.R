@@ -26,6 +26,12 @@ plot.density <-
   # number of variables
   p <- length(varnames)
   
+  # assign chain names
+  idx <- ceiling(1:nrow(df.params) / (nrow(df.params) / 4))
+  df.params <- 
+    df.params %>% 
+    mutate(chain.name = paste("chain", idx, sep = " "))
+  
   # repeat for all the variables
   for (i in 1:p) {
     
@@ -35,15 +41,16 @@ plot.density <-
     # plot the density graph
     df.param.i <- 
       df.params %>% 
-      select(all_of(current.var))
+      select(all_of(current.var), chain.name)
     
-    colnames(df.param.i) <- "value"
+    colnames(df.param.i) <- c("value", "chain.name")
     
     g.b_i <-
       df.param.i %>% 
       ggplot() + 
-      geom_density(aes(x = value)) + 
-      labs(x = current.var)
+      geom_density(aes(x = value, color = chain.name)) + 
+      labs(x = current.var) + 
+      theme(legend.position = "none")
       
     # combine with the graph output file
     if (exists("g.all")) {
