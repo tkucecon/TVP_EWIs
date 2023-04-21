@@ -1,8 +1,7 @@
 
 // -----------------------------------------------------------------------------
 // About this code
-// Estimate a logit model with time-varying coefficients
-// assumption of normal-gamma-gamma prior on beta_0 and theta
+// Estimate a logit model without time-varying coefficients
 // -----------------------------------------------------------------------------
 
 // input data
@@ -13,6 +12,7 @@ data {
   matrix[I, p]             X;      // explanatory variable matrix
   int<lower=0, upper=1>    Y[I];   // crisis dummy
   int<lower=1, upper=Tmax> Tid[I]; // time index of each sample
+  real<lower=0>            scale_global; // global shrinkage scale for theta
 }
 
 // parameters accepted by the model
@@ -20,21 +20,12 @@ parameters {
   // main
   matrix[p, Tmax]             beta;  // matrix of coefficients including intercept
   vector<lower=0, upper=5>[p] theta; // vector of sd of coefficients
-  // latent parameters for NGG prior: theta
-  vector<lower=0>[p] xi;
-  vector<lower=0>[p] kappa;
-  // latent parameters for NGG prior: beta
-  vector<lower=0>[p] tau;
-  vector<lower=0>[p] lambda;
-  // hyperparameters for NGG: theta
-  real<lower=0, upper=1> a_xi;
-  real<lower=0, upper=1> c_xi;
-  real<lower=0>          kappa_b;
-  // hyperparameters for NGG: the initial value of beta
-  real<lower=0, upper=1> a_tau;
-  real<lower=0, upper=1> c_tau;
-  real<lower=0>          lambda_b;
-
+  // latent parameters for horseshoe prior: for theta
+  vector<lower=0>[p] lambda_theta;
+  real<lower=0> tau_theta;
+  // latent parameters for horseshoe prior: for the initial values of beta
+  vector<lower=0>[p] lambda_beta1;
+  real<lower=0> tau_beta1;
 }
 
 // transformed parameters
@@ -47,14 +38,14 @@ transformed parameters {
 
 // model part
 model {
-  // priors for theta: NGG prior
-  theta        ~ normal(0, xi);
-  xi           ~ gamma(a_xi, (a_xi * kappa / 2));
-  kappa        ~ gamma(c_xi, (c_xi / kappa_b));
-  // priors for the initial value of beta: NGG prior
-  beta[, 1]    ~ normal(0, tau);
-  tau          ~ gamma(a_tau, (a_tau * lambda / 2));
-  lambda       ~ gamma(c_tau, (c_tau / lambda_b));
+  // priors for theta: horseshoe prior
+  tau_theta    ~ cauchy(0, scale_global);
+  lambda_theta ~ cauchy(0, 1);
+  theta        ~ normal(0, tau_theta * lambda_theta);
+  // priors for the initial beta: horseshoe prior
+  lambda_beta1 ~ cauchy(0, 1);
+  tau_beta1    ~ cauchy(0, 1);
+  beta[, 1]    ~ normal(0, tau_beta1 * lambda_beta1);
   // state equation: let coefficients evolve over time
   for (t in 2:Tmax) {
     beta[, t] ~ normal(beta[, t-1], theta);

@@ -96,8 +96,8 @@ saveNUTS <-
          data       = data.stan,
          pars       = pars,
          seed       = 2292,
-         warmup     = 5000,
-         iter       = 7000)
+         warmup     = 2000,
+         iter       = 3000)
   
   # extract the MCMC result
   extracted.stan <- 
@@ -194,17 +194,29 @@ saveNUTS <-
 # Save the result
 # ------------------------------------------------------------------------------
   
-  # save the file name
-  file.name <- paste("../5_tmp/", stan.file, "_", target, sep = "")
-  
-  if (!total.credit) {
-    file.name <- paste(file.name, "_alt", sep = "")
-  }
+  # if train is given as a numeric, change the directory
   if (is.numeric(train)) {
-    file.name <- paste(file.name, "_", train, sep = "")
+    file.path <- paste("../5_tmp/train", train, "/", sep = "")
+  } else{
+    file.path <- "../5_tmp/fullsample/"
+  }
+
+  # save the method and target variable in file name
+  file.name <- paste(stan.file, "_", target, sep = "")
+
+  # if total.credit is TRUE, then indicate as "tot"
+  if (total.credit) {
+    file.name <- paste(file.name, "_tot", sep = "")
+  } else {
+    file.name <- paste(file.name, "_sep", sep = "")
+  }
+  
+  # if p0 is given, save the number in the file name
+  if (is.numeric(p0)) {
+    file.name <- paste(file.name, "_tvp", p0, sep = "")
   }
   
   # This process takes some time... 
   # save the result in the tmp folder
-  save(out.list, file = paste(file.name, ".rda", sep = ""))
+  save(out.list, file = paste(file.path, file.name, ".rda", sep = ""))
 }

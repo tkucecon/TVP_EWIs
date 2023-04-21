@@ -16,16 +16,22 @@ predict.STVP <-
       out.list[[1]]
     
     # obtain the latest median estimates of beta
-    mat.beta.last <- 
+    df.beta.last <- 
       df.beta %>% 
       filter(year == max(year)) %>% 
-      select(median) %>% 
-      as.matrix()
+      select(varname, median) 
+    
+    # save the varnames
+    varnames <- unlist(df.beta.last$varname)
+    
+    # save the latest beta
+    mat.beta.last <- as.matrix(df.beta.last$median)
     
     # obtain Y and X as matrix
     mat.X <- 
       df.test %>% 
-      select(-year, -crisis, -country) %>% 
+      mutate(intercept = 1) %>% 
+      select(all_of(varnames)) %>% 
       as.matrix()
     
     mat.Y <-
@@ -35,7 +41,7 @@ predict.STVP <-
     
     # calculate q's
     mat.q <- 
-      cbind(1, mat.X) %*% mat.beta.last
+      mat.X %*% mat.beta.last
     
     # obtain the probability of crisis
     mat.prob <- 
@@ -45,8 +51,7 @@ predict.STVP <-
     df.pred <- 
       data.frame(crisis    = as.numeric(mat.Y), 
                  pred.STVP = mat.prob) %>% 
-      as_tibble() %>% 
-      rename(pred.STVP = median)
+      as_tibble()
 
     # return 
     return(df.pred)

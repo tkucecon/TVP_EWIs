@@ -13,8 +13,10 @@
   library("patchwork")
   
   library("rstan")
+  library("tidymodels")
   
   # some functions
+  source("util/regdf.r")
   source("util/saveNUTS.r")
   source("util/plot_dynamic.r")
   source("util/plot_heat.r")
@@ -31,33 +33,57 @@
 # Load the data
 # ------------------------------------------------------------------------------
   
-  # load the JST data
-  load("../4_data/df_normalized.rda")
+  # load the core data
+  load("../4_data/df_core.rda")
   
   # specify the reference year
   ref.year <- 1990
   
   # Split the data into training/test data set
   df.train <- 
-    df.normalized %>% 
+    df.core %>% 
     filter(year < ref.year)
   
   df.test <- 
-    df.normalized %>% 
+    df.core %>% 
     filter(year >= ref.year)
   
 # ------------------------------------------------------------------------------
 # estimate Sparse TVP model using the training sample and obtain the estimates of beta
 # ------------------------------------------------------------------------------
   
-  # gaussian transition with df.crisis.baseline.train
-  saveNUTS(df        = df.train,
-           stan.file = "horseshoe",
-           train     = TRUE)
+  # save the training sample
 
-  # check the result of MCMC
-  plot.heat("horseshoe_train")
-  plot.dynamic("horseshoe_train")
+  # 1. horseshoe prior (free parameter)
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "horseshoe")
+  
+  # 2. regularized horseshoe prior with different p0 assumptions
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "reghorse",
+           p0        = 2)
+  
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "reghorse",
+           p0        = 4)
+  
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "reghorse",
+           p0        = 6)
+  
+  saveNUTS(df        = df.train,
+           target    = "JST",
+           train     = ref.year,
+           stan.file = "reghorse",
+           p0        = 8)
   
 # ------------------------------------------------------------------------------
 # obtain out of sample prediction for MCMC
@@ -65,9 +91,9 @@
   
   # obtain out-of-sample predictions with the latest estimates of beta
   df.pred.STVP <- 
-    predict.STVP(MCMC.name = "horseshoe_train",
+    predict.STVP(MCMC.name = "reg_horseshoe_train",
                  df.test   = df.test)
-
+  
 # ------------------------------------------------------------------------------
 # estimate a usual logistic regression
 # ------------------------------------------------------------------------------
@@ -162,7 +188,7 @@
 # ------------------------------------------------------------------------------
   
   # obtain the historical beta of MCMC
-  load("../5_tmp/horseshoe_train.rda")
+  load("../5_tmp/reg_horseshoe_train.rda")
   df.beta <- out.list[[1]]
   
   # obtain the beta of logistic regression
@@ -196,8 +222,8 @@
   # Compare the coefficients
   g.comparison <- 
     plot.comparison(df.beta.all, "diff.credit.dom", "none") +
-    plot.comparison(df.beta.all, "diff.money.glo", "none") +
-    plot.comparison(df.beta.all, "diff.money.dom", c(0.75, 0.8))
+    plot.comparison(df.beta.all, "diff.credit.glo", "none") +
+    plot.comparison(df.beta.all, "growth.rcon.dom", c(0.75, 0.8))
   
   # save the result
   ggsave(filename = "../6_outputs/compare_1990.pdf",

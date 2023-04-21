@@ -47,7 +47,7 @@
   # 4. regularized horseshoe prior
   saveNUTS(df        = df.core,
            target    = "JST",
-           stan.file = "reg_horseshoe",
+           stan.file = "reghorse",
            p0        = 4)
 
 # ------------------------------------------------------------------------------
@@ -55,11 +55,7 @@
 # ------------------------------------------------------------------------------
 
   # 1. horseshoe prior
-  plot.heat("horseshoe_JST")
-  plot.dynamic("horseshoe_JST")
-
-  # regularized horseshoe prior
-  plot.heat("reg_horseshoe_JST")
-  plot.dynamic("reg_horseshoe_JST")
+  plot.heat(file.path = "fullsample", file.name = "horseshoe_JST_tot")
+  plot.dynamic(file.path = "fullsample", file.name = "horseshoe_JST_tot")
 
   

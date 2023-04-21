@@ -5,10 +5,7 @@
 
 # crisis data part: merge crisis series from the following three data
   # 1. Jorda Schularick and Taylor (2017): JST dataset hereafter
-  # 2. Harvard Crisis Database: based on Reinhart and Rogoff (2008) so RR dataset hereafter
-  # 3. Baron, Verner and Xiong (2021): BVX dataset hereafter
-  # .. 1 and 2 define crises based on narratives.
-  # .. 3 on the other hand uses a systematic indicator as the crisis: 30% or more decline in bank equity prices
+  # 2. Baron, Verner and Xiong (2021): BVX dataset hereafter
 
 # explanatory variable part: all data based on JST dataset
   # 1. keep only relevant variables as the level data
@@ -28,7 +25,6 @@
   theme_set(theme_solarized())
   
   library("haven")
-  library("readxl")
   library("tidymodels")
   library("DescTools")
   
@@ -46,26 +42,6 @@
     select(year, country, iso, crisisJST) %>% 
     rename(crisis.JST = crisisJST)
   
-  # load the RR (Harvard) data
-  # .xlsx data saved under 4_data/input folder
-  df.RR.original <- 
-    read_excel("../4_data/input/Harvard.xlsx")
-  
-  # extract only banking crisis information
-  df.RR.crisis <- 
-    df.RR.original %>% 
-    rename(year       = Year,
-           country    = Country,
-           iso        = CC3,
-           crisis.RR  = `Banking Crisis`,
-           dummy.gold = `Gold Standard`) %>% 
-    select(year, iso, crisis.RR, dummy.gold) %>% 
-    na.omit() %>% 
-    # df.RR.crisis now recognizes crisis as character because of some "n/a" cells
-    # change into numeric value
-    mutate(crisis.RR  = as.numeric(crisis.RR),
-           dummy.gold = as.numeric(dummy.gold))
-  
   # load the BVX data
   # .dta data saved under 4_data/input folder
   df.BVX.original <- 
@@ -74,28 +50,26 @@
   # keep only relevant values to merge
   df.BVX.crisis <- 
     df.BVX.original %>% 
-    select(year, ISO3, Rtot_real_w, C_B30) %>% 
-    rename(iso        = ISO3,
-           bank.eq    = Rtot_real_w,
-           crisis.BVX = C_B30)
+    select(year, ISO3, JC, C_B30) %>% 
+    rename(iso          = ISO3,
+           crisis.joint = JC,
+           crisis.BVX   = C_B30)
   
   # merge the three crisis data frame
   df.crisis <- 
     df.JST.crisis %>% 
-    left_join(df.RR.crisis,  by = c("iso", "year")) %>% 
     left_join(df.BVX.crisis, by = c("iso", "year")) %>% 
     # define narrative joint crisis variable as "crisis.joint"
-    # ... if either JST or RR definition shows crisis, then indicate as 1
-    mutate(crisis.joint = pmap(select(., crisis.JST, crisis.RR), ~pmax(..., na.rm = TRUE))) %>% 
+    # ... if either JST or RR definition shows crisis, then indicate as 1 (just to deal with update of JST data)
+    mutate(crisis.joint = pmap(select(., crisis.JST, crisis.joint), ~pmax(..., na.rm = TRUE))) %>% 
     # keep only relevant variables
-    select(year, country, crisis.JST, crisis.joint, crisis.BVX, bank.eq) %>% 
+    select(year, country, crisis.JST, crisis.joint, crisis.BVX) %>% 
     rename(JST   = crisis.JST,
            joint = crisis.joint,
            BVX   = crisis.BVX)
 
   # remove unnecessary data frames from the global environment
   rm(df.BVX.crisis, df.BVX.original, 
-     df.RR.crisis,  df.RR.original, 
      df.JST.crisis)
   
 # ------------------------------------------------------------------------------
