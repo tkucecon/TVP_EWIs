@@ -11,17 +11,20 @@ saveNUTS <-
            total.credit = TRUE,  # use total credit instead of household/business credit
            train        = FALSE, # indicates if this is used for training
            hyperparams  = NULL,  # hyper parameters: default is NULL
-           p0           = NULL   # p0 if indicated
+           tau0         = NULL   # global scale if indicated
            ){
     
 # ------------------------------------------------------------------------------
 # Prepare the data set
 # ------------------------------------------------------------------------------
   
-  # process the input data set with regdf
-  df <- regdf(df           = df,
-              target       = target,
-              total.credit = total.credit)
+  # process the input data set with regdf if train is False
+  # otherwise, use the training data frame as given
+  if (!is.numeric(train)) {
+    df <- regdf(df           = df,
+                target       = target,
+                total.credit = total.credit)
+  }
     
   # create the country ID according to countries
   df <- 
@@ -70,21 +73,18 @@ saveNUTS <-
          Tid      = Tid
     )
   
+  # merge the hyper parameters is given from outside of the model
+  data.stan <- 
+    c(data.stan, hyperparams)
+  
   # if p0 is given as number, save the global scale parameter
-  if (is.numeric(p0)) {
-    scale_global <- p0 / (p - p0)
+  if (is.numeric(tau0)) {
     data.stan <- 
-      c(data.stan, list(scale_global = scale_global))
+      c(data.stan, list(scale_global = tau0))
   }
   
   # indicate output pars
   pars <- c("beta", "theta")
-  
-  # if NGG is indicated as the stan file, save the result of hyper-parameter estimation as well
-  if (stan.file == "NGG") {
-    hyper.pars <- c("a_xi", "c_xi", "kappa_b", "a_tau", "c_tau", "lambda_b")
-    pars <- c(pars, hyper.pars)
-  }
   
 # ------------------------------------------------------------------------------
 # run MCMC
@@ -160,35 +160,6 @@ saveNUTS <-
   
   # save into output list
   out.list <- append(out.list, list(df.theta))
-    
-# ------------------------------------------------------------------------------
-# Save hyper-parameters (if indicated)
-# ------------------------------------------------------------------------------
-  
-  # save the result of hyper-parameter estimation
-  # ... if NGG is indicated as the stan file
-  if (stan.file == "NGG") {
-    
-    # obtain tibbles and merge with the output data frame
-    for (current.par in hyper.pars) {
-      
-      # obtain a tibble for current hyper parameter
-      df.par_i <- 
-        extracted.stan[current.par] %>% 
-        as_tibble() 
-      
-      # merge with the output data frame
-      if (current.par == "a_xi") {
-        df.hyperparam <- df.par_i
-      } else {
-        df.hyperparam <- 
-          cbind(df.hyperparam, df.par_i)
-      }
-    }
-    
-    # save into output list
-    out.list <- append(out.list, list(df.hyperparam))
-  }
 
 # ------------------------------------------------------------------------------
 # Save the result
@@ -212,8 +183,8 @@ saveNUTS <-
   }
   
   # if p0 is given, save the number in the file name
-  if (is.numeric(p0)) {
-    file.name <- paste(file.name, "_tvp", p0, sep = "")
+  if (is.numeric(tau0)) {
+    file.name <- paste(file.name, "_tau", tau0, sep = "")
   }
   
   # This process takes some time... 

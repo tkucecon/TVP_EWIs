@@ -55,60 +55,52 @@
            stan.file = "horseshoe")
 
   # 3. horseshoe prior with BVX crisis data
-  saveNUTS(df        = df.core,
-           target    = "BVX",
-           stan.file = "horseshoe")
+  # saveNUTS(df        = df.core,
+  #          target    = "BVX",
+  #          stan.file = "horseshoe")
   
-  # 4. regularized horseshoe prior
-  saveNUTS(df        = df.core,
-           target    = "JST",
-           stan.file = "reghorse",
-           p0        = 1)
-
-  saveNUTS(df        = df.core,
-           target    = "JST",
-           stan.file = "reghorse",
-           p0        = 2)
+  # 4. NGG prior with multiple crisis data
+  hyperparams <- 
+    list(a_xi     = 0.1,
+         c_xi     = 0.1,
+         kappa_b  = 20,
+         a_tau    = 0.1,
+         c_tau    = 0.1,
+         lambda_b = 20)
   
-  saveNUTS(df        = df.core,
-           target    = "JST",
-           stan.file = "reghorse",
-           p0        = 3)
-
-  saveNUTS(df        = df.core,
-           target    = "JST",
-           stan.file = "reghorse",
-           p0        = 4)
-
+  saveNUTS(df          = df.core,
+           target      = "JST",
+           hyperparams = hyperparams,
+           stan.file   = "NGG")
+  
+  saveNUTS(df          = df.core,
+           target      = "joint",
+           hyperparams = hyperparams,
+           stan.file   = "NGG")
+  
 # ------------------------------------------------------------------------------
 # plot the results
 # ------------------------------------------------------------------------------
 
-  # 1. horseshoe prior
-  plot.heat(file.path = "fullsample", file.name = "horseshoe_JST_tot")
+  # 1. horseshoe prior with JST crisis data
+  plot.heat(file.path    = "fullsample", file.name = "horseshoe_JST_tot")
   plot.dynamic(file.path = "fullsample", file.name = "horseshoe_JST_tot")
 
-  plot.heat(file.path = "fullsample", file.name = "horseshoe_JST_sep")
+  plot.heat(file.path    = "fullsample", file.name = "horseshoe_JST_sep")
   plot.dynamic(file.path = "fullsample", file.name = "horseshoe_JST_sep")
   
-  # 2. horseshoe prior
-  plot.heat(file.path = "fullsample", file.name = "horseshoe_joint_tot")
+  # 2. horseshoe prior with joint crisis data
+  plot.heat(file.path    = "fullsample", file.name = "horseshoe_joint_tot")
   plot.dynamic(file.path = "fullsample", file.name = "horseshoe_joint_tot")
   
-  # 3. horseshoe prior
-  plot.heat(file.path = "fullsample", file.name = "horseshoe_BVX_tot")
-  plot.dynamic(file.path = "fullsample", file.name = "horseshoe_BVX_tot")
+  # 3. horseshoe prior with BVX crisis data
+  # plot.heat(file.path    = "fullsample", file.name = "horseshoe_BVX_tot")
+  # plot.dynamic(file.path = "fullsample", file.name = "horseshoe_BVX_tot")
   
-  # 4. horseshoe prior
-  plot.heat(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp1")
-  plot.dynamic(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp1")
+  # 4. NGG prior with JST and joint crisis data
+  plot.heat(file.path    = "fullsample", file.name = "NGG_JST_tot")
+  plot.dynamic(file.path = "fullsample", file.name = "NGG_JST_tot")
 
-  plot.heat(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp2")
-  plot.dynamic(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp2")
-
-  plot.heat(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp3")
-  plot.dynamic(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp3")
-
-  plot.heat(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp4")
-  plot.dynamic(file.path = "fullsample", file.name = "reghorse_JST_tot_tvp4")
-
+  plot.heat(file.path    = "fullsample", file.name = "NGG_joint_tot")
+  plot.dynamic(file.path = "fullsample", file.name = "NGG_joint_tot")
+  

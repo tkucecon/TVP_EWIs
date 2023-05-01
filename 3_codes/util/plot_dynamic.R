@@ -98,8 +98,8 @@ plot.dynamic <-
   
   # save under the 6_output folder
   ggsave(plot = g.all, 
-         width = 15, height = 6, 
-         filename = paste("../6_outputs/",file.path, "/", file.name, "_ts.pdf", sep = ""))
+         width = 15, height = 10, 
+         filename = paste("../6_outputs/", file.name, "_ts.pdf", sep = ""))
   
   # return and show the plot
   return(g.all)

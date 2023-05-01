@@ -42,7 +42,7 @@ plot.heat <-
   # save under the 6_output folder
   ggsave(plot = g.heat, 
          width = 10, height = 4, 
-         filename = paste("../6_outputs/",file.path, "/", file.name, "_heat.pdf", sep = ""))
+         filename = paste("../6_outputs/", file.name, "_heat.pdf", sep = ""))
   
   # return the heat-map
   return(g.heat)

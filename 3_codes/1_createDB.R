@@ -130,6 +130,8 @@
       diff.noncore    = (level.noncore    - lag(level.noncore,    n = 2))      , # bank noncore funding ratio
       diff.xrusd      = (level.xrusd      - lag(level.xrusd,      n = 2))        # exchange rates against US dollars
     ) %>% 
+    # xrusd contains some outliers: winsorize
+    mutate(diff.xrusd = Winsorize(diff.xrusd, minval = -100, maxval = 100, na.rm = TRUE)) %>% 
     # keep only difference variables and key indicators to merge
     select(year, country, starts_with("diff"))
     
@@ -160,7 +162,7 @@
     # merge all the data
     df.JST.level %>% 
     # keep only necessary level data (drop if before transformation)
-    select(year, country, level.stir, level.slope, level.lev, level.noncore, level.ltd, level.xrusd, dummy.peg) %>% 
+    select(year, country, level.stir, level.slope, level.lev, level.noncore, level.ltd, level.xrusd, level.pdebt, dummy.peg) %>% 
     # merge transformed data
     left_join(df.JST.difference, by = c("country", "year")) %>% 
     left_join(df.JST.growth,     by = c("country", "year")) %>% 
